@@ -54,10 +54,10 @@ export class BunLambdaLayer extends LayerVersion {
       | "compatibleArchitectures"
       | "compatibleRuntimes"
       | "layerVersionName"
-    > = {},
+    >,
   ) {
     super(scope, id, {
-      ...props,
+      ...(props ?? {}),
       description: "A custom Lambda layer for Bun.",
       removalPolicy: RemovalPolicy.DESTROY,
       code: Code.fromAsset(path.join(__dirname, "../bun-lambda-layer.zip")),
