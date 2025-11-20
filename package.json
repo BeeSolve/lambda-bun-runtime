@@ -1,6 +1,6 @@
 {
   "name": "@beesolve/lambda-bun-runtime",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "scripts": {
     "buildLayer": "bun run command/buildBunLayer.ts",
@@ -21,7 +21,7 @@
     "bun-plugin-dts": "^0.3.0"
   },
   "exports": {
-    "./cdk": {
+    ".": {
       "types": "./dist/cdk.d.ts",
       "import": "./dist/cdk.js"
     }
