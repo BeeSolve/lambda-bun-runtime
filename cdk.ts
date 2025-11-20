@@ -8,7 +8,11 @@ import {
 } from "aws-cdk-lib/aws-lambda";
 import { type NodejsFunctionProps } from "aws-cdk-lib/aws-lambda-nodejs";
 import { Construct } from "constructs";
-import path from "node:path";
+import { dirname } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 type BunFunctionProps = Omit<
   NodejsFunctionProps,
@@ -33,7 +37,7 @@ export class BunFunction extends aws_lambda.Function {
   ) {
     super(scope, id, {
       ...props,
-      code: Code.fromAsset(path.dirname(entrypoint)),
+      code: Code.fromAsset(dirname(entrypoint)),
       handler: `${toEntry(entrypoint)}.fetch`,
       runtime: Runtime.PROVIDED_AL2,
       architecture: Architecture.ARM_64,
@@ -60,7 +64,7 @@ export class BunLambdaLayer extends LayerVersion {
       ...(props ?? {}),
       description: "A custom Lambda layer for Bun.",
       removalPolicy: RemovalPolicy.DESTROY,
-      code: Code.fromAsset(`${__dirname}/../bun-lambda-layer.zip`),
+      code: Code.fromAsset(`${__dirname}/../bun-lambda-layer.zip"`),
       compatibleArchitectures: [Architecture.ARM_64],
       compatibleRuntimes: [Runtime.PROVIDED_AL2],
       layerVersionName: "BunRuntime",

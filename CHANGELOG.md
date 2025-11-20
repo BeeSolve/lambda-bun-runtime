@@ -1,3 +1,7 @@
+# 1.0.4
+
+- suggest `__dirname` to `node` based on `import.meta.url`
+
 # 1.0.3
 
 - fix path to `bun-lambda-layer.zip` in `BunLambdaLayer` construct
