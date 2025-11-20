@@ -1,3 +1,7 @@
+# 1.0.6
+
+- chore: upgrade dependencies
+
 # 1.0.5
 
 - fix path by removing unneccessary `"`
