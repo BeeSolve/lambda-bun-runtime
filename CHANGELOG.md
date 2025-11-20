@@ -1,3 +1,7 @@
+# 1.0.2
+
+- fix path to `bun-lambda-layer.zip` in `BunLambdaLayer` construct
+
 # 1.0.1
 
 - change export from `@beesolve/lambda-bun-runtime/cdk` to `@beesolve/lambda-bun-runtime`
