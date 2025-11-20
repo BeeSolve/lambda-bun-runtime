@@ -9,7 +9,7 @@ rmSync("dist", { force: true, recursive: true });
 await Bun.build({
   entrypoints: ["cdk.ts"],
   outdir: "dist",
-  target: "bun",
+  target: "node",
   minify: true,
   splitting: true,
   sourcemap: "inline",

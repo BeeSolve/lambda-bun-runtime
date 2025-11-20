@@ -1,3 +1,8 @@
+# 1.0.3
+
+- fix path to `bun-lambda-layer.zip` in `BunLambdaLayer` construct
+- build for `node` not `bun`
+
 # 1.0.2
 
 - fix path to `bun-lambda-layer.zip` in `BunLambdaLayer` construct

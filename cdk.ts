@@ -60,7 +60,7 @@ export class BunLambdaLayer extends LayerVersion {
       ...(props ?? {}),
       description: "A custom Lambda layer for Bun.",
       removalPolicy: RemovalPolicy.DESTROY,
-      code: Code.fromAsset("../bun-lambda-layer.zip"),
+      code: Code.fromAsset(`${__dirname}/../bun-lambda-layer.zip`),
       compatibleArchitectures: [Architecture.ARM_64],
       compatibleRuntimes: [Runtime.PROVIDED_AL2],
       layerVersionName: "BunRuntime",
