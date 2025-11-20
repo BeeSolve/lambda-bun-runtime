@@ -1,3 +1,7 @@
+# 1.0.5
+
+- fix path by removing unneccessary `"`
+
 # 1.0.4
 
 - suggest `__dirname` to `node` based on `import.meta.url`
