@@ -1,3 +1,8 @@
+# 1.1.0
+
+- chore: upgrade bun runtime to v1.3.3
+- chore: upgrade `aws-cdk-lib`
+
 # 1.0.6
 
 - chore: upgrade dependencies
