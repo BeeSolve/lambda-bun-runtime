@@ -1,4 +1,13 @@
 
+## [1.2.3](https://github.com/beesolve/lambda-bun-runtime/compare/v1.2.2...v1.2.3) (2025-12-04)
+
+
+### Bug Fixes
+
+* fix BunFunction code path ([09032c4](https://github.com/beesolve/lambda-bun-runtime/commit/09032c4d35de58df3408f52a4cf7ad1b06ca89a4))
+* fix BunFunction code path ([f517c35](https://github.com/beesolve/lambda-bun-runtime/commit/f517c35966c82a71d4401da2d3874248cdca5689))
+* fix BunFunction code path ([3b7403c](https://github.com/beesolve/lambda-bun-runtime/commit/3b7403c9a4ca6374b13e0e57ada64f22fdcc1801))
+
 ## [1.2.2](https://github.com/beesolve/lambda-bun-runtime/compare/v1.2.1...v1.2.2) (2025-12-04)
 
 
