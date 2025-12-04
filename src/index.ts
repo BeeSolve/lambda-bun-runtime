@@ -1,3 +1,4 @@
+import { dirname } from "node:path";
 import { RemovalPolicy } from "aws-cdk-lib";
 import {
   Architecture,
@@ -9,7 +10,6 @@ import {
 } from "aws-cdk-lib/aws-lambda";
 import { type NodejsFunctionProps } from "aws-cdk-lib/aws-lambda-nodejs";
 import { Construct } from "constructs";
-import { dirname } from "node:path";
 
 const bunVersion = "1.3.3";
 
