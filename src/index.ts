@@ -4,8 +4,8 @@ import {
   Code,
   Function,
   LayerVersion,
-  Runtime,
   LayerVersionProps,
+  Runtime,
 } from "aws-cdk-lib/aws-lambda";
 import { type NodejsFunctionProps } from "aws-cdk-lib/aws-lambda-nodejs";
 import { Construct } from "constructs";
