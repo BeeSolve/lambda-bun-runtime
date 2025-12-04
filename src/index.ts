@@ -34,7 +34,7 @@ export class BunFunction extends Function {
 
     super(scope, id, {
       ...rest,
-      code: Code.fromAsset(`${__dirname}/${entrypoint}`),
+      code: Code.fromAsset(entrypoint),
       handler: `${toEntry(entrypoint)}.fetch`,
       runtime: Runtime.PROVIDED_AL2,
       architecture: Architecture.ARM_64,

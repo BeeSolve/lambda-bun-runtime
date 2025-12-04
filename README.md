@@ -1,5 +1,7 @@
 # Lambda bun runtime
 
+[![View on Construct Hub](https://constructs.dev/badge?package=%40beesolve%2Flambda-bun-runtime)](https://constructs.dev/packages/@beesolve/lambda-bun-runtime)
+
 This repository contains custom built bun runtime for AWS Lambda. It also contains CDK constructs for `BunFunction` which uses `BunLambdaLayer`.
 
 [Bun](https://bun.com) is a fast JavaScript runtime.
