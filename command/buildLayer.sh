@@ -19,7 +19,7 @@ cd packages/bun-lambda && \
 cp "$SCRIPT_DIR/runtime.ts" . && \
 bun install && \
 bun run build-layer && \
-mv ./bun-lambda-layer.zip "$SCRIPT_DIR/../src/bun-lambda-layer-$VERSION.zip" && \
+mv ./bun-lambda-layer.zip "$SCRIPT_DIR/../lib/bun-lambda-layer-$VERSION.zip" && \
 cd - && \
 cd ../.. && \
 rm -rf bun-layer

@@ -1,4 +1,5 @@
 import { awscdk, javascript, release } from "projen";
+
 const project = new awscdk.AwsCdkConstructLibrary({
   author: "BeeSolve s.r.o.",
   authorAddress: "support@beesolve.com",
@@ -30,5 +31,7 @@ project.addTask("build-layer", {
   description: "Build bun layer.",
   exec: "./command/buildLayer.sh",
 });
+
+project.addPackageIgnore("command");
 
 project.synth();
