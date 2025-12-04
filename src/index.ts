@@ -9,6 +9,7 @@ import {
 } from "aws-cdk-lib/aws-lambda";
 import { type NodejsFunctionProps } from "aws-cdk-lib/aws-lambda-nodejs";
 import { Construct } from "constructs";
+import { dirname } from "node:path";
 
 const bunVersion = "1.3.3";
 
@@ -34,7 +35,7 @@ export class BunFunction extends Function {
 
     super(scope, id, {
       ...rest,
-      code: Code.fromAsset(entrypoint),
+      code: Code.fromAsset(dirname(entrypoint)),
       handler: `${toEntry(entrypoint)}.fetch`,
       runtime: Runtime.PROVIDED_AL2,
       architecture: Architecture.ARM_64,
