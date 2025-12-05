@@ -81,7 +81,6 @@ async function fetch(url: string, options?: RequestInit): Promise<Response> {
   const { href } = new URL(url, runtimeUrl);
   const response = await globalThis.fetch(href, {
     ...options,
-    timeout: false,
   });
   if (!response.ok) {
     exit(
@@ -206,7 +205,7 @@ async function init(): Promise<Lambda> {
 
 type LambdaRequest<E = any> = {
   readonly requestId: string;
-  readonly traceId: string;
+  readonly traceId: string | undefined;
   readonly functionArn: string;
   readonly deadlineMs: number | null;
   readonly event: E;
@@ -228,19 +227,19 @@ async function receiveRequest(): Promise<LambdaRequest> {
   }
   const deadlineMs =
     parseInt(response.headers.get("Lambda-Runtime-Deadline-Ms") ?? "0") || null;
-  let event;
+
   try {
-    event = await response.json();
+    const event = await response.json();
+    return {
+      requestId,
+      traceId,
+      functionArn,
+      deadlineMs,
+      event,
+    };
   } catch (cause) {
     exit("Runtime received a request with invalid JSON", cause);
   }
-  return {
-    requestId,
-    traceId,
-    functionArn,
-    deadlineMs,
-    event,
-  };
 }
 
 type LambdaResponse = {
@@ -295,9 +294,6 @@ async function formatResponse(
       statusCode,
       headers,
       cookies,
-      // multiValueHeaders: {
-      //   "Set-Cookie": cookies,
-      // },
       isBase64Encoded,
       body,
     };
