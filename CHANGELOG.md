@@ -1,4 +1,11 @@
 
+## [1.3.0](https://github.com/beesolve/lambda-bun-runtime/compare/v1.2.3...v1.3.0) (2025-12-05)
+
+
+### Features
+
+* do not exit runtime when traceId is not present ([a762790](https://github.com/beesolve/lambda-bun-runtime/commit/a7627904cb3bca9cd4eb94fa4023fd6a52c56ec6))
+
 ## [1.2.3](https://github.com/beesolve/lambda-bun-runtime/compare/v1.2.2...v1.2.3) (2025-12-04)
 
 
