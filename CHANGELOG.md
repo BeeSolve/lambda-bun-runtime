@@ -1,4 +1,11 @@
 
+## [1.3.1](https://github.com/beesolve/lambda-bun-runtime/compare/v1.3.0...v1.3.1) (2025-12-05)
+
+
+### Bug Fixes
+
+* fix runtime `traceId` type ([248606d](https://github.com/beesolve/lambda-bun-runtime/commit/248606d5ac1cbbd91d91173366e43feb835fc7e0))
+
 ## [1.3.0](https://github.com/beesolve/lambda-bun-runtime/compare/v1.2.3...v1.3.0) (2025-12-05)
 
 
