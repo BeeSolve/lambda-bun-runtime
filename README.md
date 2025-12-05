@@ -88,3 +88,4 @@ Here are changes which were added on top of the original runtime:
 - [ ] investigate https://github.com/oven-sh/bun/issues/14139
 - [ ] investigate https://github.com/oven-sh/bun/issues/6003
 - [ ] investigate https://github.com/oven-sh/bun/issues?q=is%3Aissue%20state%3Aopen%20label%3Alambda
+- [ ] implement automatic code bundling with `BunFunction`
