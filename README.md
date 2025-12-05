@@ -67,3 +67,24 @@ console.timeEnd("Built.");
 ```
 
 When you persist above build script in `build.ts` you can then run it with `bun run build.ts`.
+
+## Why the fork?
+
+This runtime is fork of official [`bun-lambda`](https://github.com/oven-sh/bun/tree/main/packages/bun-lambda). It was created because it seems that Lambda is not very high on Bun's roadmap and there are multiple pull requests which haven't been merged.
+
+The [usage](https://github.com/oven-sh/bun/tree/main/packages/bun-lambda#usage) is the same as in official runtime.
+
+Here are changes which were added on top of the original runtime:
+
+- https://github.com/oven-sh/bun/pull/17449 - `traceId` is not guaranteed in all Lambda environments so exitting when `traceId` is not present has been removed
+- https://github.com/oven-sh/bun/pull/21018 - setting cookies now works with both HTTP Event v1 and HTTP Event v2
+- https://github.com/oven-sh/bun/pull/20640 - when using API Gateway Authorizer the authorization context is present in `Request` header called `x-amzn-authorizer`
+
+
+## Roadmap
+
+- [ ] keep in sync with latest versions of Bun
+- [ ] investigate https://github.com/oven-sh/bun/pull/20825
+- [ ] investigate https://github.com/oven-sh/bun/issues/14139
+- [ ] investigate https://github.com/oven-sh/bun/issues/6003
+- [ ] investigate https://github.com/oven-sh/bun/issues?q=is%3Aissue%20state%3Aopen%20label%3Alambda
