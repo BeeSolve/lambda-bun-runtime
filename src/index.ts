@@ -11,7 +11,7 @@ import {
 import { type NodejsFunctionProps } from "aws-cdk-lib/aws-lambda-nodejs";
 import { Construct } from "constructs";
 
-const bunVersion = "1.3.4";
+const bunVersion = "1.3.5";
 
 export interface BunFunctionProps {
   /**
