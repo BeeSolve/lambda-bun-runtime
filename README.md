@@ -83,7 +83,7 @@ Here are changes which were added on top of the original runtime:
 
 ## Roadmap
 
-- [ ] keep in sync with latest versions of Bun
+- [x] keep in sync with latest versions of Bun
 - [ ] investigate https://github.com/oven-sh/bun/pull/20825
 - [ ] investigate https://github.com/oven-sh/bun/issues/14139
 - [ ] investigate https://github.com/oven-sh/bun/issues/6003
