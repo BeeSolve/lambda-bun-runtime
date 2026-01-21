@@ -10,6 +10,7 @@ import {
 } from "aws-cdk-lib/aws-lambda";
 import { type NodejsFunctionProps } from "aws-cdk-lib/aws-lambda-nodejs";
 import { Construct } from "constructs";
+import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 
 const bunVersion = "1.3.6";
 
@@ -34,6 +35,10 @@ export class BunFunction extends Function {
     const { entrypoint, ...rest } = props;
 
     super(scope, id, {
+      logGroup: new LogGroup(scope, `${id}LogGroup`, {
+        removalPolicy: RemovalPolicy.DESTROY,
+        retention: RetentionDays.TWO_WEEKS,
+      }),
       ...rest,
       code: Code.fromAsset(dirname(entrypoint)),
       handler: `${toEntry(entrypoint)}.fetch`,
