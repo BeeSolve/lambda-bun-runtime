@@ -1,4 +1,11 @@
 
+## [1.7.0](https://github.com/beesolve/lambda-bun-runtime/compare/v1.6.1...v1.7.0) (2026-01-21)
+
+
+### Features
+
+* add log group retention + upgrade dependencies ([d9f9a71](https://github.com/beesolve/lambda-bun-runtime/commit/d9f9a7188f37592a09a5ed676de7ddea559a4df5))
+
 ## [1.6.1](https://github.com/beesolve/lambda-bun-runtime/compare/v1.6.0...v1.6.1) (2026-01-14)
 
 ## [1.6.0](https://github.com/beesolve/lambda-bun-runtime/compare/v1.5.1...v1.6.0) (2026-01-14)
