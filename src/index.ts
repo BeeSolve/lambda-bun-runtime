@@ -32,13 +32,15 @@ export interface BunFunctionProps extends Omit<
 
 export class BunFunction extends Function {
   constructor(scope: Construct, id: string, props: BunFunctionProps) {
-    const { entrypoint, ...rest } = props;
+    const { entrypoint, logGroup, ...rest } = props;
 
     super(scope, id, {
-      logGroup: new LogGroup(scope, `${id}LogGroup`, {
-        removalPolicy: RemovalPolicy.DESTROY,
-        retention: RetentionDays.TWO_WEEKS,
-      }),
+      logGroup:
+        logGroup ??
+        new LogGroup(scope, `${id}LogGroup`, {
+          removalPolicy: RemovalPolicy.DESTROY,
+          retention: RetentionDays.TWO_WEEKS,
+        }),
       ...rest,
       code: Code.fromAsset(dirname(entrypoint)),
       handler: `${toEntry(entrypoint)}.fetch`,
