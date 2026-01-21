@@ -241,6 +241,8 @@ public grantInvoke(grantee: IGrantable): Grant
 
 Grant the given identity permissions to invoke this Lambda.
 
+[disable-awslint:no-grants]
+
 ###### `grantee`<sup>Required</sup> <a name="grantee" id="@beesolve/lambda-bun-runtime.BunFunction.grantInvoke.parameter.grantee"></a>
 
 - *Type:* aws-cdk-lib.aws_iam.IGrantable
@@ -254,6 +256,8 @@ public grantInvokeCompositePrincipal(compositePrincipal: CompositePrincipal): Gr
 ```
 
 Grant multiple principals the ability to invoke this Lambda via CompositePrincipal.
+
+[disable-awslint:no-grants]
 
 ###### `compositePrincipal`<sup>Required</sup> <a name="compositePrincipal" id="@beesolve/lambda-bun-runtime.BunFunction.grantInvokeCompositePrincipal.parameter.compositePrincipal"></a>
 
@@ -269,6 +273,8 @@ public grantInvokeLatestVersion(grantee: IGrantable): Grant
 
 Grant the given identity permissions to invoke the $LATEST version or unqualified version of this Lambda.
 
+[disable-awslint:no-grants]
+
 ###### `grantee`<sup>Required</sup> <a name="grantee" id="@beesolve/lambda-bun-runtime.BunFunction.grantInvokeLatestVersion.parameter.grantee"></a>
 
 - *Type:* aws-cdk-lib.aws_iam.IGrantable
@@ -283,6 +289,8 @@ public grantInvokeUrl(grantee: IGrantable): Grant
 
 Grant the given identity permissions to invoke this Lambda Function URL.
 
+[disable-awslint:no-grants]
+
 ###### `grantee`<sup>Required</sup> <a name="grantee" id="@beesolve/lambda-bun-runtime.BunFunction.grantInvokeUrl.parameter.grantee"></a>
 
 - *Type:* aws-cdk-lib.aws_iam.IGrantable
@@ -296,6 +304,8 @@ public grantInvokeVersion(grantee: IGrantable, version: IVersion): Grant
 ```
 
 Grant the given identity permissions to invoke the given version of this Lambda.
+
+[disable-awslint:no-grants]
 
 ###### `grantee`<sup>Required</sup> <a name="grantee" id="@beesolve/lambda-bun-runtime.BunFunction.grantInvokeVersion.parameter.grantee"></a>
 

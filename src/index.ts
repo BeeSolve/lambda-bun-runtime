@@ -9,8 +9,8 @@ import {
   Runtime,
 } from "aws-cdk-lib/aws-lambda";
 import { type NodejsFunctionProps } from "aws-cdk-lib/aws-lambda-nodejs";
-import { Construct } from "constructs";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
+import { Construct } from "constructs";
 
 const bunVersion = "1.3.6";
 
