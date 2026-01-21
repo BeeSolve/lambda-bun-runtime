@@ -1,4 +1,11 @@
 
+## [1.7.1](https://github.com/beesolve/lambda-bun-runtime/compare/v1.7.0...v1.7.1) (2026-01-21)
+
+
+### Bug Fixes
+
+* allow pass existing log group ([b7f2e7a](https://github.com/beesolve/lambda-bun-runtime/commit/b7f2e7a65418ec8fba6b92b719552456a6cdad84))
+
 ## [1.7.0](https://github.com/beesolve/lambda-bun-runtime/compare/v1.6.1...v1.7.0) (2026-01-21)
 
 
