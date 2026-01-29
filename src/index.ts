@@ -12,7 +12,7 @@ import { type NodejsFunctionProps } from "aws-cdk-lib/aws-lambda-nodejs";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import { Construct } from "constructs";
 
-const bunVersion = "1.3.6";
+const bunVersion = "1.3.8";
 
 export interface BunFunctionProps {
   /**
