@@ -44,7 +44,7 @@ export class BunFunction extends Function {
       ...rest,
       code: Code.fromAsset(dirname(entrypoint)),
       handler: `${toEntry(entrypoint)}.fetch`,
-      runtime: Runtime.PROVIDED_AL2,
+      runtime: Runtime.PROVIDED_AL2023,
       architecture: Architecture.ARM_64,
       layers: [rest.bunLayer, ...(rest.layers ?? [])],
     });
@@ -70,7 +70,7 @@ export class BunLambdaLayer extends LayerVersion {
       removalPolicy: RemovalPolicy.DESTROY,
       code: Code.fromAsset(`${__dirname}/bun-lambda-layer-${bunVersion}.zip`),
       compatibleArchitectures: [Architecture.ARM_64],
-      compatibleRuntimes: [Runtime.PROVIDED_AL2],
+      compatibleRuntimes: [Runtime.PROVIDED_AL2023],
       layerVersionName: "BunRuntime",
     });
   }
