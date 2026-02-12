@@ -1,4 +1,11 @@
 
+## [1.10.0](https://github.com/beesolve/lambda-bun-runtime/compare/v1.9.0...v1.10.0) (2026-02-12)
+
+
+### Features
+
+* change underlying lambda runtime for more stable `PROVIDED_AL2023` ([4b703c6](https://github.com/beesolve/lambda-bun-runtime/commit/4b703c6420d001b36312e47b9a41146565c2fb29))
+
 ## [1.9.0](https://github.com/beesolve/lambda-bun-runtime/compare/v1.8.0...v1.9.0) (2026-02-08)
 
 
