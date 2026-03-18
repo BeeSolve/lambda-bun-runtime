@@ -2,7 +2,7 @@
 
 set -e
 
-VERSION="1.3.10"
+VERSION="1.3.11"
 TAG="bun-v$VERSION"
 
 TMPDIR=${TMPDIR:-/tmp}
