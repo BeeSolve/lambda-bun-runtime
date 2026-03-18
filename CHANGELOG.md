@@ -1,4 +1,11 @@
 
+## [1.12.1](https://github.com/beesolve/lambda-bun-runtime/compare/v1.12.0...v1.12.1) (2026-03-18)
+
+
+### Bug Fixes
+
+* bump bun verison in readme ([c088d7d](https://github.com/beesolve/lambda-bun-runtime/commit/c088d7daaf9da67a107db93f7f9b44ec92f0f1af))
+
 ## [1.12.0](https://github.com/beesolve/lambda-bun-runtime/compare/v1.11.0...v1.12.0) (2026-03-18)
 
 
