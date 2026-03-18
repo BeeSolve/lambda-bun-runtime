@@ -1,4 +1,11 @@
 
+## [1.12.0](https://github.com/beesolve/lambda-bun-runtime/compare/v1.11.0...v1.12.0) (2026-03-18)
+
+
+### Features
+
+* upgrade bun to v1.3.11; upgrade dependencies ([3455307](https://github.com/beesolve/lambda-bun-runtime/commit/3455307ab73741ce46dde1393b9b6e7abb3b4040))
+
 ## [1.11.0](https://github.com/beesolve/lambda-bun-runtime/compare/v1.10.0...v1.11.0) (2026-03-02)
 
 
