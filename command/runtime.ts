@@ -1,8 +1,9 @@
 import { AwsClient } from "aws4fetch";
 import type { Server, ServerWebSocket } from "bun";
+import { AsyncLocalStorage } from "node:async_hooks";
 
 type Lambda = {
-  fetch: (request: Request, server: Server) => Promise<Response | undefined>;
+  fetch: (request: Request, server: Server<any>) => Promise<Response | undefined>;
   error?: (error: unknown) => Promise<Response>;
   websocket?: {
     open?: (ws: ServerWebSocket) => Promise<void>;
@@ -21,6 +22,7 @@ let functionArn: string | undefined;
 let aws: AwsClient | undefined;
 
 let logger = console.log;
+let consolePatched = false;
 
 function log(level: string, ...args: any[]): void {
   if (!args.length) {
@@ -34,12 +36,18 @@ function log(level: string, ...args: any[]): void {
   }
 }
 
-console.log = (...args: any[]) => log("INFO", ...args);
-console.info = (...args: any[]) => log("INFO", ...args);
-console.warn = (...args: any[]) => log("WARN", ...args);
-console.error = (...args: any[]) => log("ERROR", ...args);
-console.debug = (...args: any[]) => log("DEBUG", ...args);
-console.trace = (...args: any[]) => log("TRACE", ...args);
+function patchConsole(): void {
+  if (consolePatched) {
+    return;
+  }
+  consolePatched = true;
+  console.log = (...args: any[]) => log("INFO", ...args);
+  console.info = (...args: any[]) => log("INFO", ...args);
+  console.warn = (...args: any[]) => log("WARN", ...args);
+  console.error = (...args: any[]) => log("ERROR", ...args);
+  console.debug = (...args: any[]) => log("DEBUG", ...args);
+  console.trace = (...args: any[]) => log("TRACE", ...args);
+}
 
 let warnings: Set<string> | undefined;
 
@@ -73,12 +81,17 @@ function env(name: string, fallback?: string): string {
   return value;
 }
 
-const runtimeUrl = new URL(
-  `http://${env("AWS_LAMBDA_RUNTIME_API")}/2018-06-01/`,
-);
+let runtimeUrl: URL | undefined;
+
+function getRuntimeUrl(): URL {
+  if (runtimeUrl === undefined) {
+    runtimeUrl = new URL(`http://${env("AWS_LAMBDA_RUNTIME_API")}/2018-06-01/`);
+  }
+  return runtimeUrl;
+}
 
 async function fetch(url: string, options?: RequestInit): Promise<Response> {
-  const { href } = new URL(url, runtimeUrl);
+  const { href } = new URL(url, getRuntimeUrl());
   const response = await globalThis.fetch(href, {
     ...options,
   });
@@ -146,7 +159,7 @@ async function throwError(type: string, cause: unknown): Promise<never> {
   exit();
 }
 
-async function init(): Promise<Lambda> {
+export async function init(): Promise<Lambda> {
   const handlerName = env("_HANDLER");
   const index = handlerName.lastIndexOf(".");
   const fileName = handlerName.substring(0, index);
@@ -203,7 +216,7 @@ async function init(): Promise<Lambda> {
   return module;
 }
 
-type LambdaRequest<E = any> = {
+export type LambdaRequest<E = any> = {
   readonly requestId: string;
   readonly traceId: string | undefined;
   readonly functionArn: string;
@@ -211,7 +224,57 @@ type LambdaRequest<E = any> = {
   readonly event: E;
 };
 
-async function receiveRequest(): Promise<LambdaRequest> {
+export type LambdaContext = {
+  readonly awsRequestId: string;
+  readonly invokedFunctionArn: string;
+  readonly deadlineMs: number | null;
+  readonly xrayTraceId: string | undefined;
+  getRemainingTimeInMillis: () => number;
+};
+
+type InvocationStore = {
+  readonly event: unknown;
+  readonly context: LambdaContext;
+};
+
+const invocationStorage = new AsyncLocalStorage<InvocationStore>();
+const invocationStorageKey = Symbol.for("bun.lambda.invocationStorage");
+
+export function getCurrentInvocationStore(): InvocationStore | undefined {
+  return invocationStorage.getStore();
+}
+
+export function getCurrentAwsEvent<E = unknown>(): E | undefined {
+  return invocationStorage.getStore()?.event as E | undefined;
+}
+
+export function getCurrentAwsContext(): LambdaContext | undefined {
+  return invocationStorage.getStore()?.context;
+}
+
+function exposeInvocationStorage(): void {
+  const globalObject = globalThis as Record<PropertyKey, unknown>;
+  if (globalObject[invocationStorageKey] === undefined) {
+    globalObject[invocationStorageKey] = invocationStorage;
+  }
+}
+
+function createLambdaContext(request: LambdaRequest): LambdaContext {
+  return {
+    awsRequestId: request.requestId,
+    invokedFunctionArn: request.functionArn,
+    deadlineMs: request.deadlineMs,
+    xrayTraceId: request.traceId,
+    getRemainingTimeInMillis() {
+      if (request.deadlineMs === null) {
+        return 0;
+      }
+      return Math.max(0, request.deadlineMs - Date.now());
+    },
+  };
+}
+
+export async function receiveRequest(): Promise<LambdaRequest> {
   const response = await fetch("runtime/invocation/next");
   requestId =
     response.headers.get("Lambda-Runtime-Aws-Request-Id") ?? undefined;
@@ -242,7 +305,7 @@ async function receiveRequest(): Promise<LambdaRequest> {
   }
 }
 
-type LambdaResponse = {
+export type LambdaResponse = {
   readonly statusCode: number;
   readonly headers?: Record<string, string>;
   readonly isBase64Encoded?: boolean;
@@ -251,7 +314,7 @@ type LambdaResponse = {
   readonly cookies?: string[];
 };
 
-async function formatResponse(
+export async function formatResponse(
   response: Response,
   eventType: "v1" | "v2",
 ): Promise<LambdaResponse> {
@@ -310,7 +373,7 @@ async function formatResponse(
   };
 }
 
-async function sendResponse(response: unknown): Promise<void> {
+export async function sendResponse(response: unknown): Promise<void> {
   if (requestId === undefined) {
     exit("Runtime attempted to send a response without a request ID");
   }
@@ -325,7 +388,10 @@ async function sendResponse(response: unknown): Promise<void> {
   });
 }
 
-function formatBody(body?: string, isBase64Encoded?: boolean): string | null {
+export function formatBody(
+  body?: string,
+  isBase64Encoded?: boolean,
+): string | null {
   if (body === undefined) {
     return null;
   }
@@ -335,7 +401,7 @@ function formatBody(body?: string, isBase64Encoded?: boolean): string | null {
   return Buffer.from(body, "base64").toString("utf8");
 }
 
-type HttpEventV1 = {
+export type HttpEventV1 = {
   readonly requestContext: {
     readonly requestId: string;
     readonly domainName: string;
@@ -350,7 +416,7 @@ type HttpEventV1 = {
   readonly body?: string;
 };
 
-function isHttpEventV1(event: any): event is HttpEventV1 {
+export function isHttpEventV1(event: any): event is HttpEventV1 {
   return (
     !event.Records &&
     event.version !== "2.0" &&
@@ -359,7 +425,7 @@ function isHttpEventV1(event: any): event is HttpEventV1 {
   );
 }
 
-function formatHttpEventV1(event: HttpEventV1): Request {
+export function formatHttpEventV1(event: HttpEventV1): Request {
   const request = event.requestContext;
   const headers = new Headers();
   for (const [name, values] of Object.entries(event.multiValueHeaders ?? {})) {
@@ -392,7 +458,7 @@ function formatHttpEventV1(event: HttpEventV1): Request {
   });
 }
 
-type HttpEventV2 = {
+export type HttpEventV2 = {
   readonly version: "2.0";
   readonly requestContext: {
     readonly requestId: string;
@@ -409,7 +475,7 @@ type HttpEventV2 = {
   readonly body?: string;
 };
 
-function isHttpEventV2(event: any): event is HttpEventV2 {
+export function isHttpEventV2(event: any): event is HttpEventV2 {
   return (
     !event.Records &&
     event.version === "2.0" &&
@@ -417,7 +483,7 @@ function isHttpEventV2(event: any): event is HttpEventV2 {
   );
 }
 
-function formatHttpEventV2(event: HttpEventV2): Request {
+export function formatHttpEventV2(event: HttpEventV2): Request {
   const request = event.requestContext;
   const headers = new Headers();
   for (const [name, values] of Object.entries(event.headers)) {
@@ -451,11 +517,11 @@ function formatHttpEventV2(event: HttpEventV2): Request {
   });
 }
 
-function isHttpEvent(event: any): boolean {
+export function isHttpEvent(event: any): boolean {
   return isHttpEventV1(event) || isHttpEventV2(event);
 }
 
-type WebSocketEvent = {
+export type WebSocketEvent = {
   readonly headers: Record<string, string>;
   readonly multiValueHeaders: Record<string, string[]>;
   readonly isBase64Encoded: boolean;
@@ -484,20 +550,20 @@ type WebSocketEvent = {
   );
 };
 
-function isWebSocketEvent(event: any): event is WebSocketEvent {
+export function isWebSocketEvent(event: any): event is WebSocketEvent {
   return (
     typeof event.requestContext === "object" &&
     typeof event.requestContext.connectionId === "string"
   );
 }
 
-function isWebSocketUpgrade(event: any): event is WebSocketEvent {
+export function isWebSocketUpgrade(event: any): event is WebSocketEvent {
   return (
     isWebSocketEvent(event) && event.requestContext.eventType === "CONNECT"
   );
 }
 
-function formatWebSocketUpgrade(event: WebSocketEvent): Request {
+export function formatWebSocketUpgrade(event: WebSocketEvent): Request {
   const request = event.requestContext;
   const headers = new Headers();
   headers.set("Upgrade", "websocket");
@@ -516,7 +582,7 @@ function formatWebSocketUpgrade(event: WebSocketEvent): Request {
   });
 }
 
-function formatUnknownEvent(event: unknown): Request {
+export function formatUnknownEvent(event: unknown): Request {
   return new Request("https://lambda/", {
     method: "POST",
     body: JSON.stringify(event),
@@ -526,7 +592,7 @@ function formatUnknownEvent(event: unknown): Request {
   });
 }
 
-function formatRequest(input: LambdaRequest): Request | undefined {
+export function formatRequest(input: LambdaRequest): Request | undefined {
   const { event, requestId, traceId, functionArn, deadlineMs } = input;
   let request: Request;
   if (isHttpEventV2(event)) {
@@ -547,12 +613,10 @@ function formatRequest(input: LambdaRequest): Request | undefined {
   if (deadlineMs !== null) {
     request.headers.set("x-amzn-deadline-ms", `${deadlineMs}`);
   }
-  // @ts-ignore: Attach the original event to the Request
-  request.aws = event;
   return request;
 }
 
-class LambdaServer implements Server {
+export class LambdaServer {
   #lambda: Lambda;
   #webSockets: Map<string, LambdaWebSocket>;
   #upgrade: Response | null;
@@ -579,10 +643,16 @@ class LambdaServer implements Server {
     const durationMs = Math.max(1, deadlineMs - Date.now());
     let response: unknown;
     try {
-      response = await Promise.race([
-        new Promise<undefined>((resolve) => setTimeout(resolve, durationMs)),
-        this.#acceptRequest(request),
-      ]);
+      const store: InvocationStore = {
+        event: request.event,
+        context: createLambdaContext(request),
+      };
+      response = await invocationStorage.run(store, () =>
+        Promise.race([
+          new Promise<undefined>((resolve) => setTimeout(resolve, durationMs)),
+          this.#acceptRequest(request),
+        ]),
+      );
     } catch (cause) {
       await sendError("RequestError", cause);
       return;
@@ -718,11 +788,12 @@ class LambdaServer implements Server {
         status: 101,
         headers: options?.headers,
       });
-      if ("aws" in request && isWebSocketUpgrade(request.aws)) {
-        const { connectionId } = request.aws.requestContext;
+      const currentEvent = getCurrentAwsEvent();
+      if (isWebSocketUpgrade(currentEvent)) {
+        const { connectionId } = currentEvent.requestContext;
         this.#webSockets.set(
           connectionId,
-          new LambdaWebSocket(request.aws, options?.data),
+          new LambdaWebSocket(currentEvent, options?.data),
         );
         this.pendingWebSockets++;
       }
@@ -905,16 +976,24 @@ class LambdaWebSocket implements ServerWebSocket {
   }
 }
 
-const lambda = await init();
-const server = new LambdaServer(lambda);
-while (true) {
-  try {
-    const request = await receiveRequest();
-    const response = await server.accept(request);
-    if (response !== undefined) {
-      await sendResponse(response);
+export async function runRuntime(): Promise<never> {
+  patchConsole();
+  exposeInvocationStorage();
+  const lambda = await init();
+  const server = new LambdaServer(lambda);
+  while (true) {
+    try {
+      const request = await receiveRequest();
+      const response = await server.accept(request);
+      if (response !== undefined) {
+        await sendResponse(response);
+      }
+    } finally {
+      reset();
     }
-  } finally {
-    reset();
   }
+}
+
+if (import.meta.main) {
+  await runRuntime();
 }

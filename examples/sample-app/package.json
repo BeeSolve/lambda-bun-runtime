@@ -1,0 +1,11 @@
+{
+  "name": "sample-app",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:handler": "bun build src/handler.ts --outfile dist/handler.js --target bun",
+    "synth": "bunx cdk synth",
+    "deploy": "bunx cdk deploy --require-approval never",
+    "destroy": "bunx cdk destroy --force"
+  }
+}

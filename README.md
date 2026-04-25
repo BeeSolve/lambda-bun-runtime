@@ -89,3 +89,41 @@ Here are changes which were added on top of the original runtime:
 - [ ] investigate https://github.com/oven-sh/bun/issues/6003
 - [ ] investigate https://github.com/oven-sh/bun/issues?q=is%3Aissue%20state%3Aopen%20label%3Alambda
 - [ ] implement automatic code bundling with `BunFunction`
+
+## Integration testing
+
+This repository includes a destroyable CDK integration app in `examples/sample-app` and a full end-to-end test in `test/integration/deploy-destroy.test.ts`.
+
+What it validates:
+
+- API Gateway REST API (`payload v1.0`) integration with `BunFunction`
+- Lambda Function URL (`payload v2.0`) integration with `BunFunction`
+- cookie reading (`Cookie: it_cookie=...`) in the handler
+- cookie writing (`Set-Cookie`) in both endpoint responses
+
+### Run locally
+
+Requirements:
+
+- configured AWS credentials with permission to create and destroy Lambda, API Gateway, IAM, CloudWatch, and CloudFormation resources
+- AWS CLI available for `integ:cleanup`
+
+Run the full deploy -> test -> destroy flow:
+
+```bash
+bun run integ:deploy-test-destroy
+```
+
+Best-effort cleanup for orphaned stacks matching `BunLayerInteg-*`:
+
+```bash
+bun run integ:cleanup
+```
+
+### CI
+
+The workflow `.github/workflows/integration.yml` runs the same integration flow in CI and then executes cleanup in an `always()` step.
+
+It expects the role ARN in:
+
+- `secrets.AWS_INTEG_ROLE_ARN`

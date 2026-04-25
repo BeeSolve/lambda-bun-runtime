@@ -1,0 +1,32 @@
+{
+  "version": "2.0",
+  "routeKey": "$default",
+  "rawPath": "/orders/123",
+  "rawQueryString": "q=one&q=two",
+  "cookies": ["session=abc", "theme=dark"],
+  "headers": {
+    "host": "api.example.com",
+    "x-forwarded-proto": "https",
+    "x-test": "v1,v2"
+  },
+  "queryStringParameters": {
+    "q": "one,two"
+  },
+  "requestContext": {
+    "requestId": "request-v2",
+    "domainName": "api.example.com",
+    "http": {
+      "method": "GET",
+      "path": "/orders/123"
+    },
+    "authorizer": {
+      "jwt": {
+        "claims": {
+          "sub": "abc"
+        }
+      }
+    }
+  },
+  "isBase64Encoded": false,
+  "body": "{\"ok\":true}"
+}
