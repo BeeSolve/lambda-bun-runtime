@@ -1,6 +1,10 @@
 {
   "dependencies": [
     {
+      "name": "@types/bun",
+      "type": "build"
+    },
+    {
       "name": "@types/node",
       "type": "build"
     },

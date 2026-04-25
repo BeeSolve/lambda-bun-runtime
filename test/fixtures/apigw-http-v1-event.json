@@ -1,0 +1,33 @@
+{
+  "version": "1.0",
+  "resource": "/pets/{petId}",
+  "path": "/pets/42",
+  "httpMethod": "POST",
+  "headers": {
+    "host": "example.execute-api.eu-central-1.amazonaws.com",
+    "x-forwarded-proto": "https"
+  },
+  "multiValueHeaders": {
+    "host": ["example.execute-api.eu-central-1.amazonaws.com"],
+    "x-forwarded-proto": ["https"],
+    "x-test": ["a", "b"]
+  },
+  "queryStringParameters": {
+    "foo": "bar"
+  },
+  "multiValueQueryStringParameters": {
+    "foo": ["bar", "baz"],
+    "flag": ["1"]
+  },
+  "requestContext": {
+    "requestId": "request-v1",
+    "domainName": "example.execute-api.eu-central-1.amazonaws.com",
+    "httpMethod": "POST",
+    "path": "/pets/42",
+    "authorizer": {
+      "principalId": "user-123"
+    }
+  },
+  "isBase64Encoded": true,
+  "body": "aGVsbG8tdjE="
+}

@@ -131,6 +131,24 @@
         }
       ]
     },
+    "integ:cleanup": {
+      "name": "integ:cleanup",
+      "description": "Best-effort cleanup of integration stacks by prefix.",
+      "steps": [
+        {
+          "exec": "bash -lc \"set -euo pipefail; stacks=$(aws cloudformation list-stacks --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE UPDATE_ROLLBACK_COMPLETE ROLLBACK_COMPLETE --query 'StackSummaries[].StackName' --output text); for stack in $stacks; do case \\\"$stack\\\" in BunLayerInteg-*) echo \\\"Destroying $stack\\\"; (cd examples/sample-app && INTEG_STACK_NAME=\\\"$stack\\\" bunx cdk destroy \\\"$stack\\\" --force);; esac; done\""
+        }
+      ]
+    },
+    "integ:deploy-test-destroy": {
+      "name": "integ:deploy-test-destroy",
+      "description": "Deploy sample app, run e2e checks, then destroy stack.",
+      "steps": [
+        {
+          "exec": "RUN_AWS_INTEG=1 bun test test/integration/deploy-destroy.test.ts"
+        }
+      ]
+    },
     "package": {
       "name": "package",
       "description": "Creates the distribution package",
@@ -235,7 +253,7 @@
       "description": "Run tests",
       "steps": [
         {
-          "spawn": "eslint"
+          "exec": "bun test"
         }
       ]
     },
@@ -264,13 +282,13 @@
       },
       "steps": [
         {
-          "exec": "bunx npm-check-updates@20 --upgrade --target=minor --peer --no-deprecated --dep=dev,peer,prod,optional --filter=@types/node,eslint-config-prettier,eslint-import-resolver-typescript,eslint-plugin-import,eslint-plugin-prettier,jsii-diff,jsii-pacmak,prettier,projen,ts-node,typescript"
+          "exec": "bunx npm-check-updates@20 --upgrade --target=minor --peer --no-deprecated --dep=dev,peer,prod,optional --filter=@types/bun,@types/node,eslint-config-prettier,eslint-import-resolver-typescript,eslint-plugin-import,eslint-plugin-prettier,jsii-diff,jsii-pacmak,prettier,projen,ts-node,typescript"
         },
         {
           "exec": "bun install"
         },
         {
-          "exec": "bun update @types/node @typescript-eslint/eslint-plugin @typescript-eslint/parser aws-cdk-lib commit-and-tag-version eslint-config-prettier eslint-import-resolver-typescript eslint-plugin-import eslint-plugin-prettier eslint jsii-diff jsii-docgen jsii-pacmak jsii-rosetta jsii prettier projen ts-node typescript yaml constructs"
+          "exec": "bun update @types/bun @types/node @typescript-eslint/eslint-plugin @typescript-eslint/parser aws-cdk-lib commit-and-tag-version eslint-config-prettier eslint-import-resolver-typescript eslint-plugin-import eslint-plugin-prettier eslint jsii-diff jsii-docgen jsii-pacmak jsii-rosetta jsii prettier projen ts-node typescript yaml constructs"
         },
         {
           "exec": "bunx projen"

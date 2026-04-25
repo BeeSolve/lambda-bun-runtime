@@ -1,0 +1,50 @@
+name: integration
+
+on:
+  workflow_dispatch: {}
+  pull_request:
+    paths:
+      - "command/**"
+      - "src/**"
+      - "examples/sample-app/**"
+      - "test/integration/**"
+      - ".github/workflows/integration.yml"
+
+concurrency:
+  group: integration-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy-test-destroy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      id-token: write
+      contents: read
+    env:
+      AWS_REGION: eu-central-1
+      CI: "true"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v5
+        with:
+          role-to-assume: ${{ secrets.AWS_INTEG_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run integration suite
+        run: bun run integ:deploy-test-destroy
+
+      - name: Cleanup leftover integration stacks
+        if: always()
+        run: bun run integ:cleanup
