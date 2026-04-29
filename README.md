@@ -6,7 +6,7 @@ This repository contains custom built bun runtime for AWS Lambda. It also contai
 
 [Bun](https://bun.com) is a fast JavaScript runtime.
 
-Current bun version: [1.3.12](https://bun.com/blog/bun-v1.3.12)
+Current bun version: [1.3.13](https://bun.com/blog/bun-v1.3.13)
 
 ## Installation
 
