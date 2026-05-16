@@ -40,6 +40,54 @@ project.addTask("build-layer", {
 
 project.addPackageIgnore("command");
 
+// Override the self-mutation job to use GitHub App token instead of PAT
+const workflowFile = project.tryFindObjectFile(".github/workflows/build.yml");
+if (workflowFile != null) {
+  // Remove the original self-mutation steps and replace with GitHub App flow
+  workflowFile.addDeletionOverride("jobs.self-mutation.steps");
+  workflowFile.addOverride("jobs.self-mutation.steps", [
+    {
+      name: "Generate token",
+      id: "app-token",
+      uses: "actions/create-github-app-token@v2",
+      with: {
+        "app-id": "${{ secrets.APP_ID }}",
+        "private-key": "${{ secrets.APP_PRIVATE_KEY }}",
+      },
+    },
+    {
+      name: "Checkout",
+      uses: "actions/checkout@v6",
+      with: {
+        token: "${{ steps.app-token.outputs.token }}",
+        ref: "${{ github.event.pull_request.head.ref }}",
+        repository: "${{ github.event.pull_request.head.repo.full_name }}",
+      },
+    },
+    {
+      name: "Download patch",
+      uses: "actions/download-artifact@v8",
+      with: {
+        name: "repo.patch",
+        path: "${{ runner.temp }}",
+      },
+    },
+    {
+      name: "Apply patch",
+      run: '[ -s ${{ runner.temp }}/repo.patch ] && git apply ${{ runner.temp }}/repo.patch || echo "Empty patch. Skipping."',
+    },
+    {
+      name: "Set git identity",
+      run: 'git config user.name "github-actions[bot]"\ngit config user.email "41898282+github-actions[bot]@users.noreply.github.com"',
+    },
+    {
+      name: "Push changes",
+      env: { PULL_REQUEST_REF: "${{ github.event.pull_request.head.ref }}" },
+      run: 'git add .\ngit commit -s -m "chore: self mutation"\ngit push origin "HEAD:$PULL_REQUEST_REF"',
+    },
+  ]);
+}
+
 project.eslint?.addOverride({
   files: ["test/**/*.ts"],
   rules: {
@@ -52,5 +100,63 @@ project.eslint?.addOverride({
 project.gitignore.addPatterns("/lib/*");
 project.gitignore.removePatterns("/lib");
 project.gitignore.include(".bun-version");
+
+// Override upgrade-main workflow to use GitHub App token
+const upgradeWorkflowFile = project.tryFindObjectFile(
+  ".github/workflows/upgrade-main.yml",
+);
+if (upgradeWorkflowFile != null) {
+  upgradeWorkflowFile.addDeletionOverride("jobs.pr.steps");
+  upgradeWorkflowFile.addOverride("jobs.pr.steps", [
+    {
+      name: "Generate token",
+      id: "app-token",
+      uses: "actions/create-github-app-token@v2",
+      with: {
+        "app-id": "${{ secrets.APP_ID }}",
+        "private-key": "${{ secrets.APP_PRIVATE_KEY }}",
+      },
+    },
+    {
+      name: "Checkout",
+      uses: "actions/checkout@v6",
+      with: { ref: "main" },
+    },
+    {
+      name: "Download patch",
+      uses: "actions/download-artifact@v8",
+      with: {
+        name: "repo.patch",
+        path: "${{ runner.temp }}",
+      },
+    },
+    {
+      name: "Apply patch",
+      run: '[ -s ${{ runner.temp }}/repo.patch ] && git apply ${{ runner.temp }}/repo.patch || echo "Empty patch. Skipping."',
+    },
+    {
+      name: "Set git identity",
+      run: 'git config user.name "github-actions[bot]"\ngit config user.email "41898282+github-actions[bot]@users.noreply.github.com"',
+    },
+    {
+      name: "Create Pull Request",
+      id: "create-pr",
+      uses: "peter-evans/create-pull-request@v8",
+      with: {
+        token: "${{ steps.app-token.outputs.token }}",
+        "commit-message":
+          'chore(deps): upgrade dependencies\n\nUpgrades project dependencies. See details in [workflow run].\n\n[Workflow Run]: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n\n------\n\n*Automatically created by projen via the "upgrade-main" workflow*',
+        branch: "github-actions/upgrade-main",
+        title: "chore(deps): upgrade dependencies",
+        body: 'Upgrades project dependencies. See details in [workflow run].\n\n[Workflow Run]: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\n\n------\n\n*Automatically created by projen via the "upgrade-main" workflow*',
+        author:
+          "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+        committer:
+          "github-actions[bot] <41898282+github-actions[bot]@users.noreply.github.com>",
+        signoff: true,
+      },
+    },
+  ]);
+}
 
 project.synth();

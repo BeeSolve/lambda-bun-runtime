@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(unzip -l /Users/ivan/data/work/github.com/beesolve/lambda-bun-runtime/lib/bun-lambda-layer-1.3.13.zip)",
+      "WebSearch"
+    ]
+  }
+}
