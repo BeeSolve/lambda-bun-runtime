@@ -9,19 +9,19 @@ const project = new awscdk.AwsCdkConstructLibrary({
   constructsVersion: "10.4.5",
   defaultReleaseBranch: "main",
   description: "AWS Lambda bun runtime layer and construct",
-  devDeps: ["aws-cdk-lib@2.238.0", "constructs@10.4.5", "yaml@^2.8.1"],
+  devDeps: ["aws-cdk-lib@2.238.0", "constructs@10.4.5", "yaml@^2.8.1", "fast-check"],
   jest: false,
   jsiiVersion: "^5.9.0",
   keywords: ["bun", "aws", "lambda", "runtime"],
   license: "MIT",
-  majorVersion: 1,
+  majorVersion: 2,
   name: "@beesolve/lambda-bun-runtime",
   npmAccess: javascript.NpmAccess.PUBLIC,
   packageManager: javascript.NodePackageManager.BUN,
   peerDeps: ["aws-cdk-lib@^2.238.0", "constructs@^10.4.5"],
   prettier: true,
   projenrcTs: true,
-  repositoryUrl: "https://github.com/beesolve/lambda-bun-runtime",
+  repositoryUrl: "git+https://github.com/BeeSolve/lambda-bun-runtime",
   releaseToNpm: true,
   releaseTrigger: release.ReleaseTrigger.manual(),
   vscode: false,
@@ -29,9 +29,13 @@ const project = new awscdk.AwsCdkConstructLibrary({
 
 project.addTask("build-layer", {
   description: "Build bun layer.",
-  exec: "./command/buildLayer.sh",
+  exec: "bun command/buildLayer.ts",
 });
 
 project.addPackageIgnore("command");
+
+project.gitignore.addPatterns("/lib/*");
+project.gitignore.removePatterns("/lib");
+project.gitignore.include(".bun-version");
 
 project.synth();

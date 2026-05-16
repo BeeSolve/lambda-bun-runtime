@@ -1,4 +1,4 @@
-import { dirname } from "node:path";
+import { basename, dirname } from "node:path";
 import { RemovalPolicy } from "aws-cdk-lib";
 import {
   Architecture,
@@ -16,9 +16,19 @@ const bunVersion = "1.3.13";
 
 export interface BunFunctionProps {
   /**
-   * Example: `${__dirname}/dist/index.js`
+   * Path to the entrypoint — accepts .ts or .js files.
+   * If .ts is provided, the construct builds it with Bun during CDK synth.
+   * If .js is provided, it is used directly (pre-compiled).
+   *
+   * Example: `${__dirname}/dist/index.js` or `${__dirname}/src/handler.ts`
    */
-  readonly entrypoint: `${string}.js`;
+  readonly entrypoint: `${string}.ts` | `${string}.js`;
+
+  /**
+   * Optional export name. Defaults to "handler".
+   * @default "handler"
+   */
+  readonly exportName?: string;
 
   /**
    * Bun layer needs to be set.
@@ -30,23 +40,26 @@ export interface BunFunctionProps extends Omit<
   "entry" | "runtime" | "architecture" | "handler" | "code" | "bundling"
 > {}
 
+// jsii requires CDK construct constructors to follow (scope, id, props) signature
 export class BunFunction extends Function {
   constructor(scope: Construct, id: string, props: BunFunctionProps) {
-    const { entrypoint, logGroup, ...rest } = props;
+    const derivedBasename = deriveBasename({ entrypoint: props.entrypoint });
+    const handler = `${derivedBasename}.${props.exportName ?? "handler"}`;
+    const code = resolveCode({ entrypoint: props.entrypoint, derivedBasename });
 
     super(scope, id, {
       logGroup:
-        logGroup ??
+        props.logGroup ??
         new LogGroup(scope, `${id}LogGroup`, {
           removalPolicy: RemovalPolicy.DESTROY,
           retention: RetentionDays.TWO_WEEKS,
         }),
-      ...rest,
-      code: Code.fromAsset(dirname(entrypoint)),
-      handler: `${toEntry(entrypoint)}.fetch`,
+      ...props,
+      code,
+      handler,
       runtime: Runtime.PROVIDED_AL2023,
       architecture: Architecture.ARM_64,
-      layers: [rest.bunLayer, ...(rest.layers ?? [])],
+      layers: [props.bunLayer, ...(props.layers ?? [])],
     });
   }
 }
@@ -66,7 +79,7 @@ export class BunLambdaLayer extends LayerVersion {
   constructor(scope: Construct, id: string, props?: BunLambdaLayerProps) {
     super(scope, id, {
       ...(props ?? {}),
-      description: "A custom Lambda layer for Bun.",
+      description: `Bun v${bunVersion} Lambda runtime layer.`,
       removalPolicy: RemovalPolicy.DESTROY,
       code: Code.fromAsset(`${__dirname}/bun-lambda-layer-${bunVersion}.zip`),
       compatibleArchitectures: [Architecture.ARM_64],
@@ -76,9 +89,30 @@ export class BunLambdaLayer extends LayerVersion {
   }
 }
 
-function toEntry(entrypoint: string): string {
-  const entry = entrypoint.split("/").pop()?.split(".").shift();
-  if (entry == null) throw Error(`Cannot parse entry from entrypoint.`);
+function deriveBasename(props: { entrypoint: string }): string {
+  const base = basename(props.entrypoint);
+  const dotIndex = base.lastIndexOf(".");
+  if (dotIndex <= 0) {
+    throw new Error(
+      `Cannot derive handler from entrypoint: ${props.entrypoint}`,
+    );
+  }
+  return base.substring(0, dotIndex);
+}
 
-  return entry;
+function resolveCode(props: { entrypoint: string; derivedBasename: string }): Code {
+  if (props.entrypoint.endsWith(".ts")) {
+    const outputDir = `${dirname(props.entrypoint)}/.bun-build/${props.derivedBasename}`;
+    return Code.fromCustomCommand(outputDir, [
+      "bun",
+      "build",
+      props.entrypoint,
+      "--outdir",
+      outputDir,
+      "--target",
+      "bun",
+      "--minify",
+    ]);
+  }
+  return Code.fromAsset(dirname(props.entrypoint));
 }

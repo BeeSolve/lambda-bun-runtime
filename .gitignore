@@ -41,10 +41,11 @@ jspm_packages/
 !/test/
 !/tsconfig.dev.json
 !/src/
-/lib
 /dist/
 !/.eslintrc.json
 .jsii
 tsconfig.json
 !/API.md
+/lib/*
+!.bun-version
 !/.projenrc.ts
