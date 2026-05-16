@@ -172,11 +172,13 @@ async function createLayerZip(props: {
   const libDir = resolve(import.meta.dir, "..", "lib");
   mkdirSync(libDir, { recursive: true });
 
-  const outputZip = join(libDir, `bun-lambda-layer-${props.version}.zip`);
-
-  if (existsSync(outputZip)) {
-    rmSync(outputZip);
+  // Remove any existing layer zips so only the current version is packaged
+  const glob = new Glob("bun-lambda-layer-*.zip");
+  for (const match of glob.scanSync({ cwd: libDir, absolute: true })) {
+    rmSync(match);
   }
+
+  const outputZip = join(libDir, `bun-lambda-layer-${props.version}.zip`);
 
   const stageDir = join(resolve(import.meta.dir, "..", ".build-tmp"), "stage");
   mkdirSync(stageDir, { recursive: true });
