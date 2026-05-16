@@ -21,25 +21,25 @@ This plan implements the modernization of `@beesolve/lambda-bun-runtime` in incr
     - Remove all Fetch API conversion, WebSocket handling, and `aws4fetch` dependency
     - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9, 1.10_
 
-  - [ ]* 1.2 Write property test: handler string resolution (Property 1)
+  - [x]* 1.2 Write property test: handler string resolution (Property 1)
     - **Property 1: Handler string resolution splits at last dot**
     - Generate strings containing at least one dot, verify split at last dot produces correct `filename` and `exportName`
     - Use fast-check with minimum 100 iterations
     - **Validates: Requirements 1.2**
 
-  - [ ]* 1.3 Write property test: context object construction (Property 3)
+  - [x]* 1.3 Write property test: context object construction (Property 3)
     - **Property 3: Context object construction**
     - Generate random environment variable values and response header values, verify all context fields match sources and `getRemainingTimeInMillis()` returns correct value within timing tolerance
     - Use fast-check with minimum 100 iterations
     - **Validates: Requirements 1.5**
 
-  - [ ]* 1.4 Write property test: error formatting (Property 4)
+  - [x]* 1.4 Write property test: error formatting (Property 4)
     - **Property 4: Error formatting preserves error information**
     - Generate Error objects with random names/messages/stacks, verify `errorType`, `errorMessage`, and `stackTrace` output. For non-Error values, verify `errorType` is `"Error"` and `errorMessage` is the inspected representation
     - Use fast-check with minimum 100 iterations
     - **Validates: Requirements 1.8**
 
-  - [ ]* 1.5 Write unit tests for runtime edge cases
+  - [x]* 1.5 Write unit tests for runtime edge cases
     - Test missing `_HANDLER` env var → init error posted
     - Test `_HANDLER` with no dot → init error posted
     - Test handler returns `undefined` → `null` posted as response
@@ -67,19 +67,19 @@ This plan implements the modernization of `@beesolve/lambda-bun-runtime` in incr
     - Run `bunx projen` to regenerate project files
     - _Requirements: 2.8_
 
-  - [ ]* 2.3 Write property test: version parameter precedence (Property 6)
+  - [x]* 2.3 Write property test: version parameter precedence (Property 6)
     - **Property 6: Version parameter precedence**
     - Generate pairs of version strings, verify CLI argument takes precedence over env var, and env var is used when CLI arg is absent
     - Use fast-check with minimum 100 iterations
     - **Validates: Requirements 2.6**
 
-  - [ ]* 2.4 Write property test: semver validation (Property 7)
+  - [x]* 2.4 Write property test: semver validation (Property 7)
     - **Property 7: Semver validation**
     - Generate strings matching `{positive_integer}.{non_negative_integer}.{non_negative_integer}` pattern → accepted. Generate strings not matching → rejected
     - Use fast-check with minimum 100 iterations
     - **Validates: Requirements 4.7**
 
-  - [ ]* 2.5 Write unit tests for build layer script
+  - [x]* 2.5 Write unit tests for build layer script
     - Test bootstrap script content is exactly `#!/bin/sh\nexec /opt/bun /opt/runtime.js`
     - Test zip structure has entries at root level (no subdirectories)
     - Test error handling for invalid version format
@@ -106,13 +106,13 @@ This plan implements the modernization of `@beesolve/lambda-bun-runtime` in incr
     - Keep ARM_64 architecture and PROVIDED_AL2023 runtime
     - _Requirements: 2.7_
 
-  - [ ]* 4.3 Write property test: BunFunction handler derivation (Property 5)
+  - [x]* 4.3 Write property test: BunFunction handler derivation (Property 5)
     - **Property 5: BunFunction handler derivation from entrypoint**
     - Generate valid file path strings ending in `.js` or `.ts` with parseable basenames, verify derived handler string equals `<basename_without_extension>.<exportName>` with default `"handler"`
     - Use fast-check with minimum 100 iterations
     - **Validates: Requirements 3.1, 3.2, 3.3**
 
-  - [ ]* 4.4 Write unit tests for CDK constructs
+  - [x]* 4.4 Write unit tests for CDK constructs
     - Test BunFunction with `.js` entrypoint produces correct handler string
     - Test BunFunction with `.ts` entrypoint uses `Code.fromCustomCommand`
     - Test BunFunction with explicit `exportName` uses provided value
@@ -188,7 +188,7 @@ This plan implements the modernization of `@beesolve/lambda-bun-runtime` in incr
     - Remove the obsolete shell script now replaced by `command/buildLayer.ts`
     - _Requirements: 2.8_
 
-  - [ ]* 8.3 Write property test: event passthrough (Property 2)
+  - [x]* 8.3 Write property test: event passthrough (Property 2)
     - **Property 2: Event passthrough preserves data**
     - Generate arbitrary JSON-serializable values, verify the runtime passes the exact parsed object to the handler without modification
     - Use fast-check with minimum 100 iterations
