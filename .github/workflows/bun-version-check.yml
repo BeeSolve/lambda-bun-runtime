@@ -5,8 +5,8 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Bun version to build (e.g., 1.3.13)"
-        required: true
+        description: "Bun version to build (e.g., 1.3.13). Leave empty to auto-detect latest."
+        required: false
         type: string
 
 jobs:
@@ -27,7 +27,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ -n "${{ inputs.version }}" ]; then
             VERSION="${{ inputs.version }}"
             echo "Manual dispatch with version: $VERSION"
 
