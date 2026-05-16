@@ -3,7 +3,7 @@
   "description": "AWS Lambda bun runtime layer and construct",
   "repository": {
     "type": "git",
-    "url": "https://github.com/beesolve/lambda-bun-runtime"
+    "url": "git+https://github.com/BeeSolve/lambda-bun-runtime"
   },
   "scripts": {
     "build": "projen build",

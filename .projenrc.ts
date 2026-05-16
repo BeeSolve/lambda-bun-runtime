@@ -21,7 +21,7 @@ const project = new awscdk.AwsCdkConstructLibrary({
   peerDeps: ["aws-cdk-lib@^2.238.0", "constructs@^10.4.5"],
   prettier: true,
   projenrcTs: true,
-  repositoryUrl: "https://github.com/beesolve/lambda-bun-runtime",
+  repositoryUrl: "git+https://github.com/BeeSolve/lambda-bun-runtime",
   releaseToNpm: true,
   releaseTrigger: release.ReleaseTrigger.manual(),
   vscode: false,
