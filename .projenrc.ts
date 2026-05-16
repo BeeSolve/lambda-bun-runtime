@@ -18,7 +18,7 @@ const project = new awscdk.AwsCdkConstructLibrary({
   ],
   jest: false,
   jsiiVersion: "^5.9.0",
-  keywords: ["bun", "aws", "lambda", "runtime"],
+  keywords: ["awscdk", "bun", "aws", "lambda", "runtime"],
   license: "MIT",
   majorVersion: 2,
   name: "@beesolve/lambda-bun-runtime",

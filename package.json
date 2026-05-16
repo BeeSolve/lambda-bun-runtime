@@ -65,6 +65,7 @@
   },
   "keywords": [
     "aws",
+    "awscdk",
     "bun",
     "cdk",
     "lambda",
