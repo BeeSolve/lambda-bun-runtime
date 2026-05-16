@@ -52,8 +52,6 @@ async function initError(error: unknown): Promise<never> {
   process.exit(1);
 }
 
-// --- Handler Resolution ---
-
 const handlerEnv = process.env._HANDLER;
 if (!handlerEnv || !handlerEnv.includes(".")) {
   await initError(
@@ -69,7 +67,7 @@ const exportName = handlerEnv!.substring(lastDot + 1);
 const taskRoot = process.env.LAMBDA_TASK_ROOT ?? "/var/task";
 const modulePath = `${taskRoot}/${filename}`;
 
-let handler: Handler;
+let handler!: Handler;
 try {
   const mod = await import(modulePath);
   const fn = mod[exportName] ?? mod.default?.[exportName];
@@ -84,8 +82,6 @@ try {
 } catch (err: unknown) {
   await initError(err);
 }
-
-// --- Invocation Loop ---
 
 const functionName = process.env.AWS_LAMBDA_FUNCTION_NAME ?? "";
 const functionVersion = process.env.AWS_LAMBDA_FUNCTION_VERSION ?? "";

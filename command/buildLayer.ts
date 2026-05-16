@@ -17,8 +17,6 @@ import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { Glob } from "bun";
 
-// --- Version Resolution ---
-
 function resolveVersion(): string {
   const cliArg = process.argv[2];
   const envVar = process.env.BUN_VERSION;
@@ -35,8 +33,6 @@ function resolveVersion(): string {
   return version;
 }
 
-// --- Version Validation ---
-
 function validateVersion(version: string): void {
   // Pattern: positive_integer.non_negative_integer.non_negative_integer
   const semverPattern = /^([1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
@@ -48,8 +44,6 @@ function validateVersion(version: string): void {
     process.exit(1);
   }
 }
-
-// --- Download ---
 
 async function downloadBunBinary(version: string, tmpDir: string): Promise<string> {
   const url = `https://github.com/oven-sh/bun/releases/download/bun-v${version}/bun-linux-aarch64.zip`;
@@ -83,8 +77,6 @@ async function downloadBunBinary(version: string, tmpDir: string): Promise<strin
   return zipPath;
 }
 
-// --- Extract ---
-
 async function extractBunBinary(zipPath: string, tmpDir: string): Promise<string> {
   console.log("Extracting Bun binary...");
 
@@ -110,8 +102,6 @@ async function extractBunBinary(zipPath: string, tmpDir: string): Promise<string
   console.error("Failed to extract Bun binary: bun executable not found in archive.");
   process.exit(1);
 }
-
-// --- Compile Runtime ---
 
 async function compileRuntime(tmpDir: string): Promise<string> {
   console.log("Compiling runtime...");
@@ -146,16 +136,12 @@ async function compileRuntime(tmpDir: string): Promise<string> {
   return outputPath;
 }
 
-// --- Generate Bootstrap ---
-
 function generateBootstrap(tmpDir: string): string {
   const bootstrapContent = "#!/bin/sh\nexec /opt/bun /opt/runtime.js\n";
   const bootstrapPath = join(tmpDir, "bootstrap");
   writeFileSync(bootstrapPath, bootstrapContent, { mode: 0o755 });
   return bootstrapPath;
 }
-
-// --- Package Zip ---
 
 async function createLayerZip(
   version: string,
@@ -220,8 +206,6 @@ async function createLayerZip(
 
   return outputZip;
 }
-
-// --- Main ---
 
 async function main(): Promise<void> {
   const version = resolveVersion();

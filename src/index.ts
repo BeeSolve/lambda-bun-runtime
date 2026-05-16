@@ -47,22 +47,7 @@ export class BunFunction extends Function {
     const derivedBasename = deriveBasename(entrypoint);
     const handler = `${derivedBasename}.${exportName ?? "handler"}`;
 
-    let code: Code;
-    if (entrypoint.endsWith(".ts")) {
-      const outputDir = `${dirname(entrypoint)}/.bun-build/${derivedBasename}`;
-      code = Code.fromCustomCommand(outputDir, [
-        "bun",
-        "build",
-        entrypoint,
-        "--outdir",
-        outputDir,
-        "--target",
-        "bun",
-        "--minify",
-      ]);
-    } else {
-      code = Code.fromAsset(dirname(entrypoint));
-    }
+    const code = resolveCode(entrypoint, derivedBasename);
 
     super(scope, id, {
       logGroup:
@@ -96,7 +81,7 @@ export class BunLambdaLayer extends LayerVersion {
   constructor(scope: Construct, id: string, props?: BunLambdaLayerProps) {
     super(scope, id, {
       ...(props ?? {}),
-      description: "A custom Lambda layer for Bun.",
+      description: `Bun v${bunVersion} Lambda runtime layer.`,
       removalPolicy: RemovalPolicy.DESTROY,
       code: Code.fromAsset(`${__dirname}/bun-lambda-layer-${bunVersion}.zip`),
       compatibleArchitectures: [Architecture.ARM_64],
@@ -119,4 +104,25 @@ function deriveBasename(entrypoint: string): string {
     );
   }
   return base.substring(0, dotIndex);
+}
+
+/**
+ * Resolves the Lambda code asset based on the entrypoint file extension.
+ * .ts files are built with Bun during CDK synth; .js files are used directly.
+ */
+function resolveCode(entrypoint: string, derivedBasename: string): Code {
+  if (entrypoint.endsWith(".ts")) {
+    const outputDir = `${dirname(entrypoint)}/.bun-build/${derivedBasename}`;
+    return Code.fromCustomCommand(outputDir, [
+      "bun",
+      "build",
+      entrypoint,
+      "--outdir",
+      outputDir,
+      "--target",
+      "bun",
+      "--minify",
+    ]);
+  }
+  return Code.fromAsset(dirname(entrypoint));
 }
