@@ -1,10 +1,10 @@
-import { describe, expect, test, beforeAll, afterAll } from "bun:test";
-import * as fc from "fast-check";
-import { App, Stack } from "aws-cdk-lib";
-import { Template } from "aws-cdk-lib/assertions";
-import { BunFunction, BunLambdaLayer } from "../src/index";
 import { existsSync, writeFileSync, unlinkSync } from "node:fs";
 import { resolve } from "node:path";
+import { App, Stack } from "aws-cdk-lib";
+import { Template } from "aws-cdk-lib/assertions";
+import { describe, expect, test, beforeAll, afterAll } from "bun:test";
+import * as fc from "fast-check";
+import { BunFunction, BunLambdaLayer } from "../src/index";
 
 // CDK's Code.fromAsset requires the zip to exist on disk during synth
 const dummyZipPath = resolve(__dirname, "../src/bun-lambda-layer-1.3.13.zip");
@@ -30,7 +30,9 @@ function deriveBasename(props: { entrypoint: string }): string {
   const base = basename(props.entrypoint);
   const dotIndex = base.lastIndexOf(".");
   if (dotIndex <= 0) {
-    throw new Error(`Cannot derive handler from entrypoint: ${props.entrypoint}`);
+    throw new Error(
+      `Cannot derive handler from entrypoint: ${props.entrypoint}`,
+    );
   }
   return base.substring(0, dotIndex);
 }
@@ -39,7 +41,9 @@ describe("BunFunction handler derivation (Property 5)", () => {
   test("derives handler as basename.handler for .js files", () => {
     fc.assert(
       fc.property(
-        fc.string({ minLength: 1, maxLength: 20 }).filter((s) => /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(s)),
+        fc
+          .string({ minLength: 1, maxLength: 20 })
+          .filter((s) => /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(s)),
         (name) => {
           const entrypoint = `/path/to/${name}.js`;
           const result = deriveBasename({ entrypoint });
@@ -53,7 +57,9 @@ describe("BunFunction handler derivation (Property 5)", () => {
   test("derives handler as basename.handler for .ts files", () => {
     fc.assert(
       fc.property(
-        fc.string({ minLength: 1, maxLength: 20 }).filter((s) => /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(s)),
+        fc
+          .string({ minLength: 1, maxLength: 20 })
+          .filter((s) => /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(s)),
         (name) => {
           const entrypoint = `/path/to/${name}.ts`;
           const result = deriveBasename({ entrypoint });
@@ -67,8 +73,15 @@ describe("BunFunction handler derivation (Property 5)", () => {
   test("handles nested paths correctly", () => {
     fc.assert(
       fc.property(
-        fc.array(fc.string({ minLength: 1, maxLength: 10 }).filter((s) => /^[a-zA-Z0-9_-]+$/.test(s)), { minLength: 1, maxLength: 5 }),
-        fc.string({ minLength: 1, maxLength: 10 }).filter((s) => /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(s)),
+        fc.array(
+          fc
+            .string({ minLength: 1, maxLength: 10 })
+            .filter((s) => /^[a-zA-Z0-9_-]+$/.test(s)),
+          { minLength: 1, maxLength: 5 },
+        ),
+        fc
+          .string({ minLength: 1, maxLength: 10 })
+          .filter((s) => /^[a-zA-Z][a-zA-Z0-9_-]*$/.test(s)),
         (dirs, name) => {
           const entrypoint = `/${dirs.join("/")}/${name}.ts`;
           const result = deriveBasename({ entrypoint });
@@ -143,7 +156,8 @@ describe("CDK construct unit tests", () => {
     const template = Template.fromStack(stack);
     const functions = template.findResources("AWS::Lambda::Function");
     for (const fn of Object.values(functions)) {
-      const handler = (fn as { Properties: { Handler: string } }).Properties.Handler;
+      const handler = (fn as { Properties: { Handler: string } }).Properties
+        .Handler;
       expect(handler).not.toContain(".fetch");
     }
   });

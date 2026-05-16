@@ -100,7 +100,10 @@ function deriveBasename(props: { entrypoint: string }): string {
   return base.substring(0, dotIndex);
 }
 
-function resolveCode(props: { entrypoint: string; derivedBasename: string }): Code {
+function resolveCode(props: {
+  entrypoint: string;
+  derivedBasename: string;
+}): Code {
   if (props.entrypoint.endsWith(".ts")) {
     const outputDir = `${dirname(props.entrypoint)}/.bun-build/${props.derivedBasename}`;
     return Code.fromCustomCommand(outputDir, [

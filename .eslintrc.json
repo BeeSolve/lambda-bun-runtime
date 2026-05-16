@@ -117,6 +117,24 @@
   "overrides": [
     {
       "files": [
+        "test/**/*.ts"
+      ],
+      "rules": {
+        "import/no-unresolved": [
+          "error",
+          {
+            "ignore": [
+              "^bun$",
+              "^bun:test$"
+            ]
+          }
+        ],
+        "@typescript-eslint/no-require-imports": "off",
+        "@typescript-eslint/no-floating-promises": "off"
+      }
+    },
+    {
+      "files": [
         ".projenrc.ts"
       ],
       "rules": {

@@ -45,16 +45,16 @@ describe("semver validation (Property 7)", () => {
 
   test("rejects invalid version formats", () => {
     const invalidVersions = [
-      "0.1.0",      // major must be positive
-      "1.03.13",    // leading zeros
-      "1.3.013",    // leading zeros
-      "01.3.13",    // leading zeros
-      "1.3.13.0",   // extra segment
-      "1.3.13-beta",// prerelease
-      "v1.3.13",    // prefix
-      "abc",        // not a version
-      "",           // empty
-      "1.3",        // missing patch
+      "0.1.0", // major must be positive
+      "1.03.13", // leading zeros
+      "1.3.013", // leading zeros
+      "01.3.13", // leading zeros
+      "1.3.13.0", // extra segment
+      "1.3.13-beta", // prerelease
+      "v1.3.13", // prefix
+      "abc", // not a version
+      "", // empty
+      "1.3", // missing patch
     ];
 
     for (const version of invalidVersions) {

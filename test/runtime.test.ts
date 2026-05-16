@@ -1,7 +1,7 @@
-import { describe, expect, test } from "bun:test";
-import { spawn } from "bun";
-import * as fc from "fast-check";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { spawn } from "bun";
+import { describe, expect, test } from "bun:test";
+import * as fc from "fast-check";
 
 // Spawns the runtime with a mock Lambda Runtime API and returns observed behavior
 function createMockServer(props: {
@@ -26,7 +26,8 @@ function createMockServer(props: {
         return new Response(JSON.stringify(props.event ?? { test: true }), {
           headers: {
             "Lambda-Runtime-Aws-Request-Id": `req-${state.invocationCount}`,
-            "Lambda-Runtime-Invoked-Function-Arn": "arn:aws:lambda:us-east-1:123:function:test",
+            "Lambda-Runtime-Invoked-Function-Arn":
+              "arn:aws:lambda:us-east-1:123:function:test",
             "Lambda-Runtime-Deadline-Ms": String(Date.now() + 30000),
           },
         });
@@ -59,7 +60,10 @@ function createMockServer(props: {
   return server;
 }
 
-async function waitFor(props: { condition: () => boolean; timeoutMs: number }): Promise<void> {
+async function waitFor(props: {
+  condition: () => boolean;
+  timeoutMs: number;
+}): Promise<void> {
   const deadline = Date.now() + props.timeoutMs;
   while (!props.condition() && Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 20));
@@ -74,8 +78,12 @@ describe("handler string resolution (Property 1)", () => {
 
     const samples = fc.sample(
       fc.tuple(
-        fc.string({ minLength: 1, maxLength: 10 }).filter((s) => /^[a-zA-Z][a-zA-Z0-9]*$/.test(s)),
-        fc.string({ minLength: 1, maxLength: 10 }).filter((s) => /^[a-zA-Z][a-zA-Z0-9]*$/.test(s)),
+        fc
+          .string({ minLength: 1, maxLength: 10 })
+          .filter((s) => /^[a-zA-Z][a-zA-Z0-9]*$/.test(s)),
+        fc
+          .string({ minLength: 1, maxLength: 10 })
+          .filter((s) => /^[a-zA-Z][a-zA-Z0-9]*$/.test(s)),
       ),
       10,
     );
@@ -91,7 +99,9 @@ describe("handler string resolution (Property 1)", () => {
       const server = createMockServer({
         port,
         event: {},
-        onResponse: (body) => { response = body; },
+        onResponse: (body) => {
+          response = body;
+        },
       });
 
       const proc = spawn(["bun", "command/runtime.mts"], {
@@ -139,11 +149,19 @@ describe("context object construction (Property 3)", () => {
 
     const samples = fc.sample(
       fc.record({
-        functionName: fc.string({ minLength: 1, maxLength: 20 }).filter((s) => /^[a-zA-Z0-9_-]+$/.test(s)),
-        functionVersion: fc.string({ minLength: 1, maxLength: 10 }).filter((s) => /^[a-zA-Z0-9.$]+$/.test(s)),
+        functionName: fc
+          .string({ minLength: 1, maxLength: 20 })
+          .filter((s) => /^[a-zA-Z0-9_-]+$/.test(s)),
+        functionVersion: fc
+          .string({ minLength: 1, maxLength: 10 })
+          .filter((s) => /^[a-zA-Z0-9.$]+$/.test(s)),
         memoryLimitInMB: fc.integer({ min: 128, max: 10240 }).map(String),
-        logGroupName: fc.string({ minLength: 1, maxLength: 30 }).filter((s) => /^[a-zA-Z0-9/_-]+$/.test(s)),
-        logStreamName: fc.string({ minLength: 1, maxLength: 30 }).filter((s) => /^[a-zA-Z0-9/_-]+$/.test(s)),
+        logGroupName: fc
+          .string({ minLength: 1, maxLength: 30 })
+          .filter((s) => /^[a-zA-Z0-9/_-]+$/.test(s)),
+        logStreamName: fc
+          .string({ minLength: 1, maxLength: 30 })
+          .filter((s) => /^[a-zA-Z0-9/_-]+$/.test(s)),
       }),
       5,
     );
@@ -168,7 +186,10 @@ describe("context object construction (Property 3)", () => {
             });
           }
           if (url.pathname.endsWith("/response")) {
-            return req.text().then((body) => { response = body; return new Response("OK"); });
+            return req.text().then((body) => {
+              response = body;
+              return new Response("OK");
+            });
           }
           return new Response("OK");
         },
@@ -224,7 +245,9 @@ describe("error formatting (Property 4)", () => {
     const server = createMockServer({
       port,
       event: {},
-      onInvocationError: (body) => { errorBody = body; },
+      onInvocationError: (body) => {
+        errorBody = body;
+      },
     });
 
     const proc = spawn(["bun", "command/runtime.mts"], {
@@ -244,7 +267,11 @@ describe("error formatting (Property 4)", () => {
     server.stop();
 
     expect(errorBody).not.toBeNull();
-    const err = errorBody as { errorType: string; errorMessage: string; stackTrace?: string[] };
+    const err = errorBody as {
+      errorType: string;
+      errorMessage: string;
+      stackTrace?: string[];
+    };
     expect(err.errorType).toBe("CustomError");
     expect(err.errorMessage).toBe("test message");
     expect(err.stackTrace).toBeDefined();
@@ -266,7 +293,9 @@ describe("error formatting (Property 4)", () => {
     const server = createMockServer({
       port,
       event: {},
-      onInvocationError: (body) => { errorBody = body; },
+      onInvocationError: (body) => {
+        errorBody = body;
+      },
     });
 
     const proc = spawn(["bun", "command/runtime.mts"], {
@@ -298,43 +327,80 @@ describe("runtime edge cases (Task 1.5)", () => {
   test("missing _HANDLER posts init error", async () => {
     const port = 19240;
     let initError: unknown = null;
-    const server = createMockServer({ port, onInitError: (body) => { initError = body; } });
+    const server = createMockServer({
+      port,
+      onInitError: (body) => {
+        initError = body;
+      },
+    });
 
     const proc = spawn(["bun", "command/runtime.mts"], {
-      env: { ...process.env, AWS_LAMBDA_RUNTIME_API: `127.0.0.1:${port}`, _HANDLER: undefined, LAMBDA_TASK_ROOT: "/tmp" },
-      stdout: "pipe", stderr: "pipe",
+      env: {
+        ...process.env,
+        AWS_LAMBDA_RUNTIME_API: `127.0.0.1:${port}`,
+        _HANDLER: undefined,
+        LAMBDA_TASK_ROOT: "/tmp",
+      },
+      stdout: "pipe",
+      stderr: "pipe",
     });
     await proc.exited;
     server.stop();
 
     expect(initError).not.toBeNull();
-    expect((initError as { errorMessage: string }).errorMessage).toContain("Invalid handler format");
+    expect((initError as { errorMessage: string }).errorMessage).toContain(
+      "Invalid handler format",
+    );
   });
 
   test("_HANDLER with no dot posts init error", async () => {
     const port = 19241;
     let initError: unknown = null;
-    const server = createMockServer({ port, onInitError: (body) => { initError = body; } });
+    const server = createMockServer({
+      port,
+      onInitError: (body) => {
+        initError = body;
+      },
+    });
 
     const proc = spawn(["bun", "command/runtime.mts"], {
-      env: { ...process.env, AWS_LAMBDA_RUNTIME_API: `127.0.0.1:${port}`, _HANDLER: "nodot", LAMBDA_TASK_ROOT: "/tmp" },
-      stdout: "pipe", stderr: "pipe",
+      env: {
+        ...process.env,
+        AWS_LAMBDA_RUNTIME_API: `127.0.0.1:${port}`,
+        _HANDLER: "nodot",
+        LAMBDA_TASK_ROOT: "/tmp",
+      },
+      stdout: "pipe",
+      stderr: "pipe",
     });
     await proc.exited;
     server.stop();
 
     expect(initError).not.toBeNull();
-    expect((initError as { errorMessage: string }).errorMessage).toContain("Invalid handler format");
+    expect((initError as { errorMessage: string }).errorMessage).toContain(
+      "Invalid handler format",
+    );
   });
 
   test("handler module not found posts init error", async () => {
     const port = 19242;
     let initError: unknown = null;
-    const server = createMockServer({ port, onInitError: (body) => { initError = body; } });
+    const server = createMockServer({
+      port,
+      onInitError: (body) => {
+        initError = body;
+      },
+    });
 
     const proc = spawn(["bun", "command/runtime.mts"], {
-      env: { ...process.env, AWS_LAMBDA_RUNTIME_API: `127.0.0.1:${port}`, _HANDLER: "nonexistent.handler", LAMBDA_TASK_ROOT: "/tmp/nonexistent" },
-      stdout: "pipe", stderr: "pipe",
+      env: {
+        ...process.env,
+        AWS_LAMBDA_RUNTIME_API: `127.0.0.1:${port}`,
+        _HANDLER: "nonexistent.handler",
+        LAMBDA_TASK_ROOT: "/tmp/nonexistent",
+      },
+      stdout: "pipe",
+      stderr: "pipe",
     });
     await proc.exited;
     server.stop();
@@ -349,17 +415,30 @@ describe("runtime edge cases (Task 1.5)", () => {
     writeFileSync(`${tmpDir}/bad.js`, "export const handler = 42;");
 
     let initError: unknown = null;
-    const server = createMockServer({ port, onInitError: (body) => { initError = body; } });
+    const server = createMockServer({
+      port,
+      onInitError: (body) => {
+        initError = body;
+      },
+    });
 
     const proc = spawn(["bun", "command/runtime.mts"], {
-      env: { ...process.env, AWS_LAMBDA_RUNTIME_API: `127.0.0.1:${port}`, _HANDLER: "bad.handler", LAMBDA_TASK_ROOT: tmpDir },
-      stdout: "pipe", stderr: "pipe",
+      env: {
+        ...process.env,
+        AWS_LAMBDA_RUNTIME_API: `127.0.0.1:${port}`,
+        _HANDLER: "bad.handler",
+        LAMBDA_TASK_ROOT: tmpDir,
+      },
+      stdout: "pipe",
+      stderr: "pipe",
     });
     await proc.exited;
     server.stop();
 
     expect(initError).not.toBeNull();
-    expect((initError as { errorMessage: string }).errorMessage).toContain("not a function");
+    expect((initError as { errorMessage: string }).errorMessage).toContain(
+      "not a function",
+    );
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
@@ -367,14 +446,29 @@ describe("runtime edge cases (Task 1.5)", () => {
     const port = 19244;
     const tmpDir = "/tmp/test-undef-response";
     mkdirSync(tmpDir, { recursive: true });
-    writeFileSync(`${tmpDir}/undef.js`, "export const handler = async () => undefined;");
+    writeFileSync(
+      `${tmpDir}/undef.js`,
+      "export const handler = async () => undefined;",
+    );
 
     let response: string | null = null;
-    const server = createMockServer({ port, event: {}, onResponse: (body) => { response = body; } });
+    const server = createMockServer({
+      port,
+      event: {},
+      onResponse: (body) => {
+        response = body;
+      },
+    });
 
     const proc = spawn(["bun", "command/runtime.mts"], {
-      env: { ...process.env, AWS_LAMBDA_RUNTIME_API: `127.0.0.1:${port}`, _HANDLER: "undef.handler", LAMBDA_TASK_ROOT: tmpDir },
-      stdout: "pipe", stderr: "pipe",
+      env: {
+        ...process.env,
+        AWS_LAMBDA_RUNTIME_API: `127.0.0.1:${port}`,
+        _HANDLER: "undef.handler",
+        LAMBDA_TASK_ROOT: tmpDir,
+      },
+      stdout: "pipe",
+      stderr: "pipe",
     });
 
     await waitFor({ condition: () => response != null, timeoutMs: 5000 });
@@ -391,7 +485,10 @@ describe("event passthrough (Property 2)", () => {
   test("preserves arbitrary JSON data through handler", async () => {
     const tmpDir = "/tmp/test-passthrough";
     mkdirSync(tmpDir, { recursive: true });
-    writeFileSync(`${tmpDir}/echo.js`, "export const handler = async (event) => event;");
+    writeFileSync(
+      `${tmpDir}/echo.js`,
+      "export const handler = async (event) => event;",
+    );
 
     const samples = fc.sample(fc.jsonValue(), 5);
 
@@ -416,15 +513,24 @@ describe("event passthrough (Property 2)", () => {
             });
           }
           if (url.pathname.endsWith("/response")) {
-            return req.text().then((body) => { response = body; return new Response("OK"); });
+            return req.text().then((body) => {
+              response = body;
+              return new Response("OK");
+            });
           }
           return new Response("OK");
         },
       });
 
       const proc = spawn(["bun", "command/runtime.mts"], {
-        env: { ...process.env, AWS_LAMBDA_RUNTIME_API: `127.0.0.1:${port}`, _HANDLER: "echo.handler", LAMBDA_TASK_ROOT: tmpDir },
-        stdout: "pipe", stderr: "pipe",
+        env: {
+          ...process.env,
+          AWS_LAMBDA_RUNTIME_API: `127.0.0.1:${port}`,
+          _HANDLER: "echo.handler",
+          LAMBDA_TASK_ROOT: tmpDir,
+        },
+        stdout: "pipe",
+        stderr: "pipe",
       });
 
       await waitFor({ condition: () => response != null, timeoutMs: 5000 });
