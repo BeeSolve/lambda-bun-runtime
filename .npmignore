@@ -22,6 +22,10 @@ tsconfig.tsbuildinfo
 /.eslintrc.json
 !.jsii
 command
+/.claude
+/.kiro
+/.bun-version
+/docs
 /.gitattributes
 /.projenrc.ts
 /projenrc

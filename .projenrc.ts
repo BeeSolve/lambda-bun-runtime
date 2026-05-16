@@ -39,6 +39,10 @@ project.addTask("build-layer", {
 });
 
 project.addPackageIgnore("command");
+project.addPackageIgnore("/.claude");
+project.addPackageIgnore("/.kiro");
+project.addPackageIgnore("/.bun-version");
+project.addPackageIgnore("/docs");
 
 // Override the self-mutation job to use GitHub App token instead of PAT
 const workflowFile = project.tryFindObjectFile(".github/workflows/build.yml");
