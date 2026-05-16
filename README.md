@@ -4,7 +4,7 @@
 
 A custom [Bun](https://bun.sh) runtime for AWS Lambda with CDK constructs for easy deployment.
 
-Current bun version: [1.3.13](https://bun.sh/blog/bun-v1.3.13)
+Current bun version: [1.3.14](https://bun.sh/blog/bun-v1.3.14)
 
 ## Installation
 
