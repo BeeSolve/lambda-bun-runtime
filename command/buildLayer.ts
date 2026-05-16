@@ -11,7 +11,7 @@
  *   2. BUN_VERSION environment variable
  */
 
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { Glob } from "bun";
 
@@ -46,16 +46,14 @@ async function main(): Promise<void> {
 function resolveVersion(): string {
   const cliArg = process.argv[2];
   const envVar = process.env.BUN_VERSION;
-  const version = cliArg ?? envVar;
+  if (cliArg ?? envVar) return (cliArg ?? envVar)!;
 
-  if (version == null) {
-    console.error(
-      "No Bun version specified. Set BUN_VERSION or pass as argument.",
-    );
-    process.exit(1);
-  }
+  const srcPath = resolve(import.meta.dir, "..", "src", "index.ts");
+  const match = readFileSync(srcPath, "utf8").match(/const bunVersion = "([^"]+)"/);
+  if (match) return match[1];
 
-  return version;
+  console.error("No Bun version specified. Set BUN_VERSION, pass as argument, or define bunVersion in src/index.ts.");
+  process.exit(1);
 }
 
 function validateVersion(props: { version: string }): void {
