@@ -9,7 +9,13 @@ const project = new awscdk.AwsCdkConstructLibrary({
   constructsVersion: "10.4.5",
   defaultReleaseBranch: "main",
   description: "AWS Lambda bun runtime layer and construct",
-  devDeps: ["aws-cdk-lib@2.238.0", "constructs@10.4.5", "yaml@^2.8.1", "fast-check"],
+  devDeps: [
+    "@types/bun",
+    "aws-cdk-lib@2.238.0",
+    "constructs@10.4.5",
+    "yaml@^2.8.1",
+    "fast-check",
+  ],
   jest: false,
   jsiiVersion: "^5.9.0",
   keywords: ["bun", "aws", "lambda", "runtime"],
@@ -33,6 +39,15 @@ project.addTask("build-layer", {
 });
 
 project.addPackageIgnore("command");
+
+project.eslint?.addOverride({
+  files: ["test/**/*.ts"],
+  rules: {
+    "import/no-unresolved": ["error", { ignore: ["^bun$", "^bun:test$"] }],
+    "@typescript-eslint/no-require-imports": "off",
+    "@typescript-eslint/no-floating-promises": "off",
+  },
+});
 
 project.gitignore.addPatterns("/lib/*");
 project.gitignore.removePatterns("/lib");
