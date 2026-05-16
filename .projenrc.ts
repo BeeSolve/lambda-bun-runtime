@@ -9,7 +9,7 @@ const project = new awscdk.AwsCdkConstructLibrary({
   constructsVersion: "10.4.5",
   defaultReleaseBranch: "main",
   description: "AWS Lambda bun runtime layer and construct",
-  devDeps: ["aws-cdk-lib@2.238.0", "constructs@10.4.5", "yaml@^2.8.1"],
+  devDeps: ["aws-cdk-lib@2.238.0", "constructs@10.4.5", "yaml@^2.8.1", "fast-check"],
   jest: false,
   jsiiVersion: "^5.9.0",
   keywords: ["bun", "aws", "lambda", "runtime"],

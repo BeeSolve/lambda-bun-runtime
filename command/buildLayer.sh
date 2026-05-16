@@ -16,7 +16,7 @@ cd bun && \
 git checkout "$TAG" && \
 git sparse-checkout set packages/bun-lambda && \
 cd packages/bun-lambda && \
-cp "$SCRIPT_DIR/runtime.ts" . && \
+cp "$SCRIPT_DIR/runtime.mts" . && \
 bun install && \
 bun run build-layer && \
 mv ./bun-lambda-layer.zip "$SCRIPT_DIR/../lib/bun-lambda-layer-$VERSION.zip" && \
