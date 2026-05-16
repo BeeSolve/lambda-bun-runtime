@@ -1,8 +1,3 @@
-/**
- * Minimal AWS Lambda Custom Runtime for Bun.
- * Implements the Lambda Runtime API loop with Node.js-style (event, context) handler signature.
- */
-
 interface LambdaContext {
   functionName: string;
   functionVersion: string;
@@ -25,40 +20,13 @@ interface LambdaError {
 const RUNTIME_API = process.env.AWS_LAMBDA_RUNTIME_API;
 const BASE_URL = `http://${RUNTIME_API}/2018-06-01`;
 
-function formatError(error: unknown): LambdaError {
-  if (error instanceof Error) {
-    return {
-      errorType: error.name || "Error",
-      errorMessage: error.message,
-      ...(error.stack ? { stackTrace: error.stack.split("\n") } : {}),
-    };
-  }
-  return {
-    errorType: "Error",
-    errorMessage: typeof error === "string" ? error : Bun.inspect(error),
-  };
-}
-
-async function postError(path: string, error: unknown): Promise<void> {
-  await fetch(`${BASE_URL}/${path}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/vnd.aws.lambda.error+json" },
-    body: JSON.stringify(formatError(error)),
-  });
-}
-
-async function initError(error: unknown): Promise<never> {
-  await postError("runtime/init/error", error);
-  process.exit(1);
-}
-
 const handlerEnv = process.env._HANDLER;
-if (!handlerEnv || !handlerEnv.includes(".")) {
-  await initError(
-    new Error(
+if (handlerEnv == null || !handlerEnv.includes(".")) {
+  await initError({
+    error: new Error(
       `Invalid handler format: "${handlerEnv ?? ""}". Expected "filename.exportName".`,
     ),
-  );
+  });
 }
 
 const lastDot = handlerEnv!.lastIndexOf(".");
@@ -67,21 +35,7 @@ const exportName = handlerEnv!.substring(lastDot + 1);
 const taskRoot = process.env.LAMBDA_TASK_ROOT ?? "/var/task";
 const modulePath = `${taskRoot}/${filename}`;
 
-let handler!: Handler;
-try {
-  const mod = await import(modulePath);
-  const fn = mod[exportName] ?? mod.default?.[exportName];
-  if (typeof fn !== "function") {
-    await initError(
-      new Error(
-        `Handler "${exportName}" is not a function in module "${filename}".`,
-      ),
-    );
-  }
-  handler = fn as Handler;
-} catch (err: unknown) {
-  await initError(err);
-}
+const handler: Handler = await resolveHandler({ modulePath, exportName });
 
 const functionName = process.env.AWS_LAMBDA_FUNCTION_NAME ?? "";
 const functionVersion = process.env.AWS_LAMBDA_FUNCTION_VERSION ?? "";
@@ -120,6 +74,52 @@ while (true) {
       body,
     });
   } catch (err: unknown) {
-    await postError(`runtime/invocation/${requestId}/error`, err);
+    await postError({ path: `runtime/invocation/${requestId}/error`, error: err });
   }
+}
+
+async function resolveHandler(props: { modulePath: string; exportName: string }): Promise<Handler> {
+  try {
+    const mod = await import(props.modulePath);
+    const fn = mod[props.exportName] ?? mod.default?.[props.exportName];
+    if (typeof fn !== "function") {
+      await initError({
+        error: new Error(
+          `Handler "${props.exportName}" is not a function in module "${props.modulePath}".`,
+        ),
+      });
+    }
+    return fn as Handler;
+  } catch (err: unknown) {
+    await initError({ error: err });
+  }
+  // Unreachable — initError calls process.exit, but TS needs a return
+  throw new Error("Unreachable");
+}
+
+function formatError(props: { error: unknown }): LambdaError {
+  if (props.error instanceof Error) {
+    return {
+      errorType: props.error.name || "Error",
+      errorMessage: props.error.message,
+      ...(props.error.stack != null ? { stackTrace: props.error.stack.split("\n") } : {}),
+    };
+  }
+  return {
+    errorType: "Error",
+    errorMessage: typeof props.error === "string" ? props.error : Bun.inspect(props.error),
+  };
+}
+
+async function postError(props: { path: string; error: unknown }): Promise<void> {
+  await fetch(`${BASE_URL}/${props.path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/vnd.aws.lambda.error+json" },
+    body: JSON.stringify(formatError({ error: props.error })),
+  });
+}
+
+async function initError(props: { error: unknown }): Promise<never> {
+  await postError({ path: "runtime/init/error", error: props.error });
+  process.exit(1);
 }

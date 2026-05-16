@@ -134,6 +134,7 @@ function assertUnreachable(value: never): never {
 ### Comments
 
 - Do not add comments that merely restate what the code does.
+- Do not add section-separator comments (e.g., `// --- Section Name ---`). Code organization should be self-evident from function grouping and file structure.
 - Add comments only when there is a tradeoff, non-obvious reasoning, or a "why not the obvious approach" explanation.
 
 ### Helper Extraction & Reuse

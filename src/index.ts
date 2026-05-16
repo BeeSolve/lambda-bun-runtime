@@ -40,28 +40,26 @@ export interface BunFunctionProps extends Omit<
   "entry" | "runtime" | "architecture" | "handler" | "code" | "bundling"
 > {}
 
+// jsii requires CDK construct constructors to follow (scope, id, props) signature
 export class BunFunction extends Function {
   constructor(scope: Construct, id: string, props: BunFunctionProps) {
-    const { entrypoint, exportName, logGroup, ...rest } = props;
-
-    const derivedBasename = deriveBasename(entrypoint);
-    const handler = `${derivedBasename}.${exportName ?? "handler"}`;
-
-    const code = resolveCode(entrypoint, derivedBasename);
+    const derivedBasename = deriveBasename({ entrypoint: props.entrypoint });
+    const handler = `${derivedBasename}.${props.exportName ?? "handler"}`;
+    const code = resolveCode({ entrypoint: props.entrypoint, derivedBasename });
 
     super(scope, id, {
       logGroup:
-        logGroup ??
+        props.logGroup ??
         new LogGroup(scope, `${id}LogGroup`, {
           removalPolicy: RemovalPolicy.DESTROY,
           retention: RetentionDays.TWO_WEEKS,
         }),
-      ...rest,
+      ...props,
       code,
       handler,
       runtime: Runtime.PROVIDED_AL2023,
       architecture: Architecture.ARM_64,
-      layers: [rest.bunLayer, ...(rest.layers ?? [])],
+      layers: [props.bunLayer, ...(props.layers ?? [])],
     });
   }
 }
@@ -91,32 +89,24 @@ export class BunLambdaLayer extends LayerVersion {
   }
 }
 
-/**
- * Derives the base filename without extension from an entrypoint path.
- * Throws if the entrypoint has no parseable basename.
- */
-function deriveBasename(entrypoint: string): string {
-  const base = basename(entrypoint);
+function deriveBasename(props: { entrypoint: string }): string {
+  const base = basename(props.entrypoint);
   const dotIndex = base.lastIndexOf(".");
   if (dotIndex <= 0) {
     throw new Error(
-      `Cannot derive handler from entrypoint: ${entrypoint}`,
+      `Cannot derive handler from entrypoint: ${props.entrypoint}`,
     );
   }
   return base.substring(0, dotIndex);
 }
 
-/**
- * Resolves the Lambda code asset based on the entrypoint file extension.
- * .ts files are built with Bun during CDK synth; .js files are used directly.
- */
-function resolveCode(entrypoint: string, derivedBasename: string): Code {
-  if (entrypoint.endsWith(".ts")) {
-    const outputDir = `${dirname(entrypoint)}/.bun-build/${derivedBasename}`;
+function resolveCode(props: { entrypoint: string; derivedBasename: string }): Code {
+  if (props.entrypoint.endsWith(".ts")) {
+    const outputDir = `${dirname(props.entrypoint)}/.bun-build/${props.derivedBasename}`;
     return Code.fromCustomCommand(outputDir, [
       "bun",
       "build",
-      entrypoint,
+      props.entrypoint,
       "--outdir",
       outputDir,
       "--target",
@@ -124,5 +114,5 @@ function resolveCode(entrypoint: string, derivedBasename: string): Code {
       "--minify",
     ]);
   }
-  return Code.fromAsset(dirname(entrypoint));
+  return Code.fromAsset(dirname(props.entrypoint));
 }
