@@ -1,4 +1,4 @@
-import { dirname } from "node:path";
+import { basename, dirname } from "node:path";
 import { RemovalPolicy } from "aws-cdk-lib";
 import {
   Architecture,
@@ -16,9 +16,19 @@ const bunVersion = "1.3.13";
 
 export interface BunFunctionProps {
   /**
-   * Example: `${__dirname}/dist/index.js`
+   * Path to the entrypoint — accepts .ts or .js files.
+   * If .ts is provided, the construct builds it with Bun during CDK synth.
+   * If .js is provided, it is used directly (pre-compiled).
+   *
+   * Example: `${__dirname}/dist/index.js` or `${__dirname}/src/handler.ts`
    */
-  readonly entrypoint: `${string}.js`;
+  readonly entrypoint: `${string}.ts` | `${string}.js`;
+
+  /**
+   * Optional export name. Defaults to "handler".
+   * @default "handler"
+   */
+  readonly exportName?: string;
 
   /**
    * Bun layer needs to be set.
@@ -32,7 +42,27 @@ export interface BunFunctionProps extends Omit<
 
 export class BunFunction extends Function {
   constructor(scope: Construct, id: string, props: BunFunctionProps) {
-    const { entrypoint, logGroup, ...rest } = props;
+    const { entrypoint, exportName, logGroup, ...rest } = props;
+
+    const derivedBasename = deriveBasename(entrypoint);
+    const handler = `${derivedBasename}.${exportName ?? "handler"}`;
+
+    let code: Code;
+    if (entrypoint.endsWith(".ts")) {
+      const outputDir = `${dirname(entrypoint)}/.bun-build/${derivedBasename}`;
+      code = Code.fromCustomCommand(outputDir, [
+        "bun",
+        "build",
+        entrypoint,
+        "--outdir",
+        outputDir,
+        "--target",
+        "bun",
+        "--minify",
+      ]);
+    } else {
+      code = Code.fromAsset(dirname(entrypoint));
+    }
 
     super(scope, id, {
       logGroup:
@@ -42,8 +72,8 @@ export class BunFunction extends Function {
           retention: RetentionDays.TWO_WEEKS,
         }),
       ...rest,
-      code: Code.fromAsset(dirname(entrypoint)),
-      handler: `${toEntry(entrypoint)}.fetch`,
+      code,
+      handler,
       runtime: Runtime.PROVIDED_AL2023,
       architecture: Architecture.ARM_64,
       layers: [rest.bunLayer, ...(rest.layers ?? [])],
@@ -76,9 +106,17 @@ export class BunLambdaLayer extends LayerVersion {
   }
 }
 
-function toEntry(entrypoint: string): string {
-  const entry = entrypoint.split("/").pop()?.split(".").shift();
-  if (entry == null) throw Error(`Cannot parse entry from entrypoint.`);
-
-  return entry;
+/**
+ * Derives the base filename without extension from an entrypoint path.
+ * Throws if the entrypoint has no parseable basename.
+ */
+function deriveBasename(entrypoint: string): string {
+  const base = basename(entrypoint);
+  const dotIndex = base.lastIndexOf(".");
+  if (dotIndex <= 0) {
+    throw new Error(
+      `Cannot derive handler from entrypoint: ${entrypoint}`,
+    );
+  }
+  return base.substring(0, dotIndex);
 }

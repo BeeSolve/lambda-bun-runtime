@@ -1,0 +1,77 @@
+name: release
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: "Bun version used to build the layer"
+        required: true
+        type: string
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Bun version used to build the layer"
+        required: true
+        type: string
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      BUN_VERSION: ${{ inputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build layer
+        run: bun command/buildLayer.ts
+
+      - name: Read package version
+        id: pkg_version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Package version: ${VERSION}"
+
+      - name: Verify layer zip exists
+        run: |
+          ZIP_FILE="lib/bun-lambda-layer-${{ inputs.version }}.zip"
+          if [ ! -f "$ZIP_FILE" ]; then
+            echo "::error::Layer zip not found: ${ZIP_FILE}"
+            exit 1
+          fi
+          echo "Found layer zip: ${ZIP_FILE}"
+
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: "v${{ steps.pkg_version.outputs.version }}"
+          name: "v${{ steps.pkg_version.outputs.version }}"
+          body: |
+            ## Lambda Bun Runtime v${{ steps.pkg_version.outputs.version }}
+
+            Built with Bun v${{ inputs.version }}
+
+            ### Assets
+            - `bun-lambda-layer-${{ inputs.version }}.zip` — Prebuilt Lambda layer (Linux ARM64)
+          files: "lib/bun-lambda-layer-${{ inputs.version }}.zip"
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify release asset uploaded
+        if: failure()
+        run: |
+          echo "::error::Release asset upload failed. No release published without artifact."
+          exit 1

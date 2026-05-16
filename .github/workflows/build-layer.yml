@@ -1,0 +1,76 @@
+name: build-layer
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Bun version to build (semver, e.g. 1.3.13)"
+        required: true
+        type: string
+  workflow_call:
+    inputs:
+      version:
+        description: "Bun version to build (semver, e.g. 1.3.13)"
+        required: true
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      BUN_VERSION: ${{ inputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build layer
+        run: bun command/buildLayer.ts
+
+      - name: Build CDK constructs
+        run: bunx projen build
+
+      - name: Upload layer artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: bun-lambda-layer-${{ inputs.version }}
+          path: lib/bun-lambda-layer-${{ inputs.version }}.zip
+          overwrite: true
+
+  publish:
+    needs: build
+    if: success()
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Download layer artifact
+        uses: actions/download-artifact@v8
+        with:
+          name: bun-lambda-layer-${{ inputs.version }}
+          path: lib
+
+      - name: Trigger release workflow
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'release.yml',
+              ref: 'main',
+              inputs: {
+                version: '${{ inputs.version }}'
+              }
+            });

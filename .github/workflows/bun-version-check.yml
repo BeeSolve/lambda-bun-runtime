@@ -1,0 +1,94 @@
+name: bun-version-check
+on:
+  schedule:
+    - cron: "0 6 * * *" # Daily at 06:00 UTC
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Bun version to build (e.g., 1.3.13)"
+        required: true
+        type: string
+
+jobs:
+  check-version:
+    name: Check for new Bun release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      new_version: ${{ steps.resolve.outputs.new_version }}
+      should_build: ${{ steps.resolve.outputs.should_build }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Resolve version
+        id: resolve
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+            echo "Manual dispatch with version: $VERSION"
+
+            # Validate semver format: positive_integer.non_negative_integer.non_negative_integer
+            if ! echo "$VERSION" | grep -qE '^[1-9][0-9]*\.[0-9]+\.[0-9]+$'; then
+              echo "::error::Invalid version format: $VERSION. Expected semver (e.g., 1.3.13). First segment must be a positive integer."
+              exit 1
+            fi
+
+            echo "new_version=$VERSION" >> "$GITHUB_OUTPUT"
+            echo "should_build=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Scheduled run: fetching latest stable Bun release..."
+
+            # Fetch latest stable release (non-prerelease, non-draft) from oven-sh/bun
+            LATEST_RELEASE=$(gh api repos/oven-sh/bun/releases \
+              --jq '[.[] | select(.prerelease == false and .draft == false and (.tag_name | test("canary") | not))][0].tag_name')
+
+            if [ -z "$LATEST_RELEASE" ]; then
+              echo "::error::Failed to fetch latest Bun release from GitHub API"
+              exit 1
+            fi
+
+            # Strip "bun-v" prefix to get version number
+            LATEST_VERSION="${LATEST_RELEASE#bun-v}"
+            echo "Latest stable Bun release: $LATEST_VERSION"
+
+            # Read current version from .bun-version file (if it exists)
+            CURRENT_VERSION=""
+            if [ -f .bun-version ]; then
+              CURRENT_VERSION=$(cat .bun-version)
+              echo "Current version in repo: $CURRENT_VERSION"
+            else
+              echo "No .bun-version file found, treating as new"
+            fi
+
+            if [ "$LATEST_VERSION" = "$CURRENT_VERSION" ]; then
+              echo "Already up to date (v$CURRENT_VERSION). No build needed."
+              echo "should_build=false" >> "$GITHUB_OUTPUT"
+            else
+              echo "New version detected: $LATEST_VERSION (current: ${CURRENT_VERSION:-none})"
+              echo "new_version=$LATEST_VERSION" >> "$GITHUB_OUTPUT"
+              echo "should_build=true" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+  trigger-build:
+    name: Trigger build-layer workflow
+    needs: check-version
+    if: needs.check-version.outputs.should_build == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Trigger build-layer workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ needs.check-version.outputs.new_version }}"
+          echo "Triggering build-layer workflow with version: $VERSION"
+          gh workflow run build-layer.yml \
+            --repo "${{ github.repository }}" \
+            -f version="$VERSION"

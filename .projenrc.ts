@@ -29,7 +29,7 @@ const project = new awscdk.AwsCdkConstructLibrary({
 
 project.addTask("build-layer", {
   description: "Build bun layer.",
-  exec: "./command/buildLayer.sh",
+  exec: "bun command/buildLayer.ts",
 });
 
 project.addPackageIgnore("command");

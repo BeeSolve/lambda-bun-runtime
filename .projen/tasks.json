@@ -29,7 +29,7 @@
       "description": "Build bun layer.",
       "steps": [
         {
-          "exec": "./command/buildLayer.sh"
+          "exec": "bun command/buildLayer.ts"
         }
       ]
     },
