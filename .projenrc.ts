@@ -10,6 +10,8 @@ const project = new awscdk.AwsCdkConstructLibrary({
   defaultReleaseBranch: "main",
   description: "AWS Lambda bun runtime layer and construct",
   devDeps: [
+    "@aws-sdk/client-lambda",
+    "@aws-sdk/client-s3",
     "@types/bun",
     "aws-cdk-lib@2.238.0",
     "constructs@10.4.5",
@@ -38,11 +40,25 @@ project.addTask("build-layer", {
   exec: "bun command/buildLayer.ts",
 });
 
+project.package.addField("workspaces", ["examples/sample-app"]);
+
 project.addPackageIgnore("command");
 project.addPackageIgnore("/.claude");
 project.addPackageIgnore("/.kiro");
 project.addPackageIgnore("/.bun-version");
 project.addPackageIgnore("/docs");
+project.addPackageIgnore("/examples");
+project.addPackageIgnore("/test/integration");
+
+project.addTask("integ:deploy-test-destroy", {
+  description: "Deploy sample app, run integration tests, then destroy stack.",
+  exec: "RUN_AWS_INTEG=1 bun test test/integration/deploy-destroy.test.ts",
+});
+
+project.addTask("integ:cleanup", {
+  description: "Best-effort cleanup of leftover BunLayerInteg-* stacks.",
+  exec: `bash -lc "set -euo pipefail; stacks=\\$(aws cloudformation list-stacks --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE UPDATE_ROLLBACK_COMPLETE ROLLBACK_COMPLETE --query 'StackSummaries[].StackName' --output text); for stack in \\$stacks; do case \\"\\$stack\\" in BunLayerInteg-*) echo \\"Destroying \\$stack\\"; (cd examples/sample-app && INTEG_STACK_NAME=\\"\\$stack\\" bunx cdk destroy \\"\\$stack\\" --force);; esac; done"`,
+});
 
 // Override the self-mutation job to use GitHub App token instead of PAT
 const workflowFile = project.tryFindObjectFile(".github/workflows/build.yml");

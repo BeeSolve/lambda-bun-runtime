@@ -1,5 +1,5 @@
 import { basename, dirname } from "node:path";
-import { RemovalPolicy } from "aws-cdk-lib";
+import { RemovalPolicy, Stack } from "aws-cdk-lib";
 import {
   Architecture,
   Code,
@@ -51,6 +51,7 @@ export class BunFunction extends Function {
       logGroup:
         props.logGroup ??
         new LogGroup(scope, `${id}LogGroup`, {
+          logGroupName: `/aws/lambda/${Stack.of(scope).stackName}-${id}`,
           removalPolicy: RemovalPolicy.DESTROY,
           retention: RetentionDays.TWO_WEEKS,
         }),

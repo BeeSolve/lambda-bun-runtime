@@ -26,6 +26,8 @@ command
 /.kiro
 /.bun-version
 /docs
+/examples
+/test/integration
 /.gitattributes
 /.projenrc.ts
 /projenrc
