@@ -1551,7 +1551,8 @@ const bunFunctionProps: BunFunctionProps = { ... }
 | **Name** | **Type** | **Description** |
 | --- | --- | --- |
 | <code><a href="#@beesolve/lambda-bun-runtime.BunFunctionProps.property.bunLayer">bunLayer</a></code> | <code><a href="#@beesolve/lambda-bun-runtime.BunLambdaLayer">BunLambdaLayer</a></code> | Bun layer needs to be set. |
-| <code><a href="#@beesolve/lambda-bun-runtime.BunFunctionProps.property.entrypoint">entrypoint</a></code> | <code>string</code> | Example: `${__dirname}/dist/index.js`. |
+| <code><a href="#@beesolve/lambda-bun-runtime.BunFunctionProps.property.entrypoint">entrypoint</a></code> | <code>string</code> | Path to the entrypoint — accepts .ts or .js files. If .ts is provided, the construct builds it with Bun during CDK synth. If .js is provided, it is used directly (pre-compiled). |
+| <code><a href="#@beesolve/lambda-bun-runtime.BunFunctionProps.property.exportName">exportName</a></code> | <code>string</code> | Optional export name. |
 
 ---
 
@@ -1575,7 +1576,24 @@ public readonly entrypoint: string;
 
 - *Type:* string
 
-Example: `${__dirname}/dist/index.js`.
+Path to the entrypoint — accepts .ts or .js files. If .ts is provided, the construct builds it with Bun during CDK synth. If .js is provided, it is used directly (pre-compiled).
+
+Example: `${__dirname}/dist/index.js` or `${__dirname}/src/handler.ts`
+
+---
+
+##### `exportName`<sup>Optional</sup> <a name="exportName" id="@beesolve/lambda-bun-runtime.BunFunctionProps.property.exportName"></a>
+
+```typescript
+public readonly exportName: string;
+```
+
+- *Type:* string
+- *Default:* "handler"
+
+Optional export name.
+
+Defaults to "handler".
 
 ---
 
