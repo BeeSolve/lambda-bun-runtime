@@ -146,3 +146,9 @@ function assertUnreachable(value: never): never {
 ### Refactoring Discipline
 
 - After completing each implementation step, do a quick consistency pass: verify naming, immutability, guard clauses, props pattern, and export hygiene are all followed.
+
+### Testing
+
+- Test only the public interface. Do not extract private functions into separate modules solely to make them testable.
+- If a function is not reused outside its file, it stays private — test its behavior through the public API or integration tests instead.
+- For scripts and runtimes without exports, use integration tests (e.g., spawn the process, mock external APIs, verify observable behavior).
