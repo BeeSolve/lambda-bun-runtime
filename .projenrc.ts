@@ -1,5 +1,7 @@
 import { awscdk, javascript, release } from "projen";
 
+const bunVersion = "1.3.14";
+
 const project = new awscdk.AwsCdkConstructLibrary({
   author: "BeeSolve s.r.o.",
   authorAddress: "support@beesolve.com",
@@ -37,7 +39,7 @@ const project = new awscdk.AwsCdkConstructLibrary({
 
 project.addTask("build-layer", {
   description: "Build bun layer.",
-  exec: "bun command/buildLayer.ts",
+  exec: `bun command/buildLayer.ts ${bunVersion}`,
 });
 
 project.package.addField("workspaces", ["examples/sample-app"]);
