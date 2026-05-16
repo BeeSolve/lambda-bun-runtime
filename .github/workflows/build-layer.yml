@@ -68,6 +68,15 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+      - name: Compute package version
+        id: pkg
+        run: |
+          BUN_MAJOR=$(echo "${{ inputs.version }}" | cut -d. -f1)
+          BUN_MINOR=$(echo "${{ inputs.version }}" | cut -d. -f2)
+          BUN_PATCH=$(echo "${{ inputs.version }}" | cut -d. -f3)
+          PKG_MINOR=$((BUN_MAJOR * 100 + BUN_MINOR))
+          echo "version=2.${PKG_MINOR}.${BUN_PATCH}" >> "$GITHUB_OUTPUT"
+
       - name: Commit and create PR
         uses: peter-evans/create-pull-request@v8
         with:
@@ -78,15 +87,18 @@ jobs:
           body: |
             Updates the Bun Lambda runtime layer to v${{ inputs.version }}.
 
+            **Package version:** `${{ steps.pkg.outputs.version }}`
+
             ### Changes
             - Built new layer zip: `lib/bun-lambda-layer-${{ inputs.version }}.zip`
             - Updated `src/index.ts` version constant
             - Updated `README.md` version badge
             - Updated `.bun-version`
 
+            Merging this PR will trigger the release workflow and publish `@beesolve/lambda-bun-runtime@${{ steps.pkg.outputs.version }}` to npm.
+
             [Workflow Run]: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           add-paths: |
             .bun-version
             src/index.ts
             README.md
-            lib/bun-lambda-layer-*.zip

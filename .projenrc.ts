@@ -14,7 +14,7 @@ const project = new awscdk.AwsCdkConstructLibrary({
   jsiiVersion: "^5.9.0",
   keywords: ["bun", "aws", "lambda", "runtime"],
   license: "MIT",
-  majorVersion: 1,
+  majorVersion: 2,
   name: "@beesolve/lambda-bun-runtime",
   npmAccess: javascript.NpmAccess.PUBLIC,
   packageManager: javascript.NodePackageManager.BUN,
@@ -37,6 +37,5 @@ project.addPackageIgnore("command");
 project.gitignore.addPatterns("/lib/*");
 project.gitignore.removePatterns("/lib");
 project.gitignore.include(".bun-version");
-project.gitignore.include("lib/bun-lambda-layer-*.zip");
 
 project.synth();

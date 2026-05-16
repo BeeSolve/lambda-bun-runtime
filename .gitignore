@@ -48,5 +48,4 @@ tsconfig.json
 !/API.md
 /lib/*
 !.bun-version
-!lib/bun-lambda-layer-*.zip
 !/.projenrc.ts
