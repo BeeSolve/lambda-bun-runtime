@@ -2,23 +2,19 @@
 
 [![View on Construct Hub](https://constructs.dev/badge?package=%40beesolve%2Flambda-bun-runtime)](https://constructs.dev/packages/@beesolve/lambda-bun-runtime)
 
-This repository contains custom built bun runtime for AWS Lambda. It also contains CDK constructs for `BunFunction` which uses `BunLambdaLayer`.
+A custom [Bun](https://bun.sh) runtime for AWS Lambda with CDK constructs for easy deployment.
 
-[Bun](https://bun.com) is a fast JavaScript runtime.
-
-Current bun version: [1.3.13](https://bun.com/blog/bun-v1.3.13)
+Current bun version: [1.3.13](https://bun.sh/blog/bun-v1.3.13)
 
 ## Installation
-
-You can install current version of our Lambda bun runtime from `npm` like this:
 
 ```bash
 npm i @beesolve/lambda-bun-runtime
 ```
 
-## Usage
+## Quick Start
 
-There are two constructs which you can use right ahead - `BunFunction` which depends on `BunLambdaLayer`:
+Two constructs are provided: `BunLambdaLayer` (the runtime layer) and `BunFunction` (a Lambda function that uses it).
 
 ```ts
 import { BunLambdaLayer, BunFunction } from '@beesolve/lambda-bun-runtime';
@@ -37,11 +33,13 @@ const apiHandler = new BunFunction(this, "ApiHandler", {
 });
 ```
 
-You can pass additional properties to both `BunLambdaLayer` and `BunFunction`.
+`BunFunction` accepts `.ts` and `.js` entrypoints. TypeScript files are built with Bun automatically during CDK synth. JavaScript files are used as-is.
 
-`BunFunction` accepts both `.ts` and `.js` entrypoints. When a `.ts` file is provided, the construct builds it with Bun during CDK synth automatically. When a `.js` file is provided, it is used directly (pre-compiled).
+By default, the Lambda handler string is derived as `<filename>.handler`. Override with the `exportName` prop.
 
-Handlers use the standard Node.js-style `(event, context) => response` signature:
+## Handler Signature
+
+Handlers use the standard Node.js-style `(event, context) => response` signature — the same pattern used by all official AWS Lambda runtimes:
 
 ```ts
 // api.ts
@@ -53,13 +51,13 @@ export const handler = async (event: unknown, context: unknown) => {
 };
 ```
 
-By default, `BunFunction` derives the Lambda handler string as `<filename>.handler`. You can override the export name with the `exportName` prop.
+This is a deliberate design choice. See [Why raw events?](#why-raw-events) below.
 
-## Fetch API Integration
+## Fetch API Support
 
-This package uses a minimal runtime that passes raw Lambda events to your handler. It does **not** re-implement or bundle Fetch API conversion helpers.
+This runtime passes raw Lambda events directly to your handler. It does **not** convert events to Fetch API `Request`/`Response` objects.
 
-If you want to write handlers using the Fetch API (`Request`/`Response`) that work both in Bun's native HTTP server and in Lambda, use the companion package [`@beesolve/lambda-fetch-api`](https://github.com/BeeSolve/packages/tree/main/packages/lambda-fetch-api).
+If you want to write handlers using the Fetch API — for example to share code between Bun's native HTTP server and Lambda — use the companion package [`@beesolve/lambda-fetch-api`](https://github.com/BeeSolve/packages/tree/main/packages/lambda-fetch-api).
 
 ### Installation
 
@@ -69,7 +67,7 @@ npm i @beesolve/lambda-fetch-api
 
 ### Usage with `asHttpV2Handler`
 
-The recommended pattern exports both a `fetch` function (for Bun's native server / local development) and a `handler` function (for Lambda invocation via this runtime) from the same file:
+The recommended pattern exports both a `fetch` function (for local development with `bun run --serve`) and a `handler` function (for Lambda) from the same file:
 
 ```ts
 import { asHttpV2Handler } from '@beesolve/lambda-fetch-api';
@@ -78,36 +76,106 @@ const fetch = async (request: Request): Promise<Response> => {
   return new Response("Hello from Bun!");
 };
 
-// Export handler for Lambda (used by the Bun runtime)
 export const handler = asHttpV2Handler(fetch);
 
-// Export fetch for Bun's native HTTP server (local development)
 export default { fetch };
 ```
 
-This dual-export pattern lets you run the same file locally with `bun run --serve` and deploy it to Lambda without changes.
+This dual-export pattern lets you run the same file locally and deploy it to Lambda without changes.
 
-### Important notes
+## WebSocket Support
 
-- `@beesolve/lambda-fetch-api` is a **separate package** maintained at [`https://github.com/BeeSolve/packages/tree/main/packages/lambda-fetch-api`](https://github.com/BeeSolve/packages/tree/main/packages/lambda-fetch-api). Future enhancements to Fetch API helpers will be made in that package independently.
-- Users who need Fetch API support must install `@beesolve/lambda-fetch-api` as a separate dependency.
-- This package (`@beesolve/lambda-bun-runtime`) does not re-implement or bundle Fetch API conversion helpers.
+WebSocket handling is **not supported** out of the box. Lambda functions are request-response by nature and don't maintain persistent connections.
 
-## Why not the official bun-lambda?
+If you need WebSocket support, consider using [API Gateway WebSocket APIs](https://docs.aws.amazon.com/apigateway/latest/developerguide/apigateway-websocket-api.html) with separate `$connect`, `$disconnect`, and `$default` route handlers — each deployed as a standard `BunFunction` with the raw event signature.
 
-This runtime was originally a fork of the official [`bun-lambda`](https://github.com/oven-sh/bun/tree/main/packages/bun-lambda) package. It has since been rewritten as a minimal Node.js-style runtime (~80 lines) that passes raw `(event, context)` to handlers instead of converting Lambda events to Fetch API `Request`/`Response` objects.
+## Migration Guide
 
-The simplified approach means:
-- No Fetch API conversion overhead
-- Standard Lambda handler signature — same as Node.js runtimes
-- Fetch API support is available via the companion [`@beesolve/lambda-fetch-api`](https://github.com/BeeSolve/packages/tree/main/packages/lambda-fetch-api) package for those who need it
+If you're migrating from the previous Fetch API-based runtime (or from the official `bun-lambda` package), here's what changed and how to adapt.
 
+### What changed
 
-## Roadmap
+The previous runtime converted Lambda events into Fetch API `Request` objects and expected a `Response` back. The new runtime passes raw `(event, context)` directly — no conversion layer.
 
-- [x] keep in sync with latest versions of Bun
-- [ ] investigate https://github.com/oven-sh/bun/pull/20825
-- [ ] investigate https://github.com/oven-sh/bun/issues/14139
-- [ ] investigate https://github.com/oven-sh/bun/issues/6003
-- [ ] investigate https://github.com/oven-sh/bun/issues?q=is%3Aissue%20state%3Aopen%20label%3Alambda
-- [ ] implement automatic code bundling with `BunFunction`
+### Option 1: Use raw events (recommended for new code)
+
+Replace your Fetch-style handler with a standard Lambda handler:
+
+**Before (Fetch API style):**
+```ts
+export default {
+  fetch: async (request: Request): Promise<Response> => {
+    const url = new URL(request.url);
+    return new Response(`Path: ${url.pathname}`);
+  },
+};
+```
+
+**After (raw event style):**
+```ts
+import type { APIGatewayProxyEventV2 } from "aws-lambda";
+
+export const handler = async (event: APIGatewayProxyEventV2) => {
+  return {
+    statusCode: 200,
+    body: `Path: ${event.rawPath}`,
+  };
+};
+```
+
+### Option 2: Keep Fetch API with the adapter (recommended for existing projects)
+
+If you have existing Fetch-based handlers and want to keep them, install the companion package and wrap them:
+
+```bash
+npm i @beesolve/lambda-fetch-api
+```
+
+**Before (worked with old runtime directly):**
+```ts
+export default {
+  fetch: async (request: Request): Promise<Response> => {
+    return new Response("Hello!");
+  },
+};
+```
+
+**After (works with new runtime via adapter):**
+```ts
+import { asHttpV2Handler } from '@beesolve/lambda-fetch-api';
+
+const fetch = async (request: Request): Promise<Response> => {
+  return new Response("Hello!");
+};
+
+export const handler = asHttpV2Handler(fetch);
+
+// Keep for local development with `bun run --serve`
+export default { fetch };
+```
+
+### Summary of changes
+
+| Aspect | Old runtime | New runtime |
+|--------|-------------|-------------|
+| Handler signature | `fetch(request: Request): Response` | `handler(event, context): any` |
+| Event format | Converted to Fetch `Request` | Raw Lambda event (e.g., `APIGatewayProxyEventV2`) |
+| Response format | Fetch `Response` | Lambda response object (e.g., `{ statusCode, body }`) |
+| Fetch API support | Built-in | Via `@beesolve/lambda-fetch-api` adapter |
+| WebSocket support | Built-in (via Bun.serve) | Not applicable (use API Gateway WebSocket APIs) |
+| Local development | `bun run --serve` with same file | Same file works with dual-export pattern |
+
+## Why Raw Events?
+
+The previous approach (converting Lambda events to Fetch API objects) introduced complexity and overhead:
+
+1. **Conversion cost** — every invocation paid the price of constructing a `Request` and parsing a `Response`, even for non-HTTP triggers (SQS, S3, EventBridge, etc.)
+2. **Lossy abstraction** — Lambda events contain metadata (request context, authorizer claims, stage variables) that doesn't map cleanly to HTTP headers
+3. **Trigger lock-in** — Fetch API only makes sense for HTTP triggers, but Lambda functions handle many event sources
+4. **Debugging friction** — when something goes wrong, you're debugging two layers: the event-to-Request conversion and your actual logic
+
+The raw event approach means:
+- Zero overhead — events pass through untouched
+- Works with any Lambda trigger (HTTP, SQS, S3, EventBridge, DynamoDB Streams, etc.)
+- Standard Lambda patterns — all AWS documentation and examples apply directly
+- Fetch API is opt-in via `@beesolve/lambda-fetch-api` for those who want the dual-environment pattern

@@ -34,4 +34,9 @@ project.addTask("build-layer", {
 
 project.addPackageIgnore("command");
 
+project.gitignore.addPatterns("/lib/*");
+project.gitignore.removePatterns("/lib");
+project.gitignore.include(".bun-version");
+project.gitignore.include("lib/bun-lambda-layer-*.zip");
+
 project.synth();

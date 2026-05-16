@@ -14,10 +14,12 @@ on:
         type: string
 
 jobs:
-  build:
+  build-and-pr:
+    name: Build layer and create PR
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
+      pull-requests: write
     env:
       BUN_VERSION: ${{ inputs.version }}
     steps:
@@ -32,45 +34,59 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Remove old layer zip
+        run: rm -f lib/bun-lambda-layer-*.zip
+
       - name: Build layer
         run: bun command/buildLayer.ts
 
+      - name: Verify layer zip exists
+        run: |
+          ZIP_FILE="lib/bun-lambda-layer-${{ inputs.version }}.zip"
+          if [ ! -f "$ZIP_FILE" ]; then
+            echo "::error::Layer zip not found: ${ZIP_FILE}"
+            exit 1
+          fi
+          echo "Layer zip built: ${ZIP_FILE}"
+
+      - name: Update .bun-version
+        run: echo "${{ inputs.version }}" > .bun-version
+
+      - name: Update src/index.ts
+        run: |
+          sed -i "s/const bunVersion = \".*\"/const bunVersion = \"${{ inputs.version }}\"/" src/index.ts
+
+      - name: Update README.md
+        run: |
+          sed -i "s|Current bun version: \[.*\](.*)|Current bun version: [${{ inputs.version }}](https://bun.sh/blog/bun-v${{ inputs.version }})|" README.md
+
       - name: Build CDK constructs
-        run: bunx projen build
+        run: bunx projen compile
 
-      - name: Upload layer artifact
-        uses: actions/upload-artifact@v7
+      - name: Set git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit and create PR
+        uses: peter-evans/create-pull-request@v8
         with:
-          name: bun-lambda-layer-${{ inputs.version }}
-          path: lib/bun-lambda-layer-${{ inputs.version }}.zip
-          overwrite: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "feat: update bun runtime to v${{ inputs.version }}"
+          branch: "bun-update/${{ inputs.version }}"
+          title: "feat: update bun runtime to v${{ inputs.version }}"
+          body: |
+            Updates the Bun Lambda runtime layer to v${{ inputs.version }}.
 
-  publish:
-    needs: build
-    if: success()
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
+            ### Changes
+            - Built new layer zip: `lib/bun-lambda-layer-${{ inputs.version }}.zip`
+            - Updated `src/index.ts` version constant
+            - Updated `README.md` version badge
+            - Updated `.bun-version`
 
-      - name: Download layer artifact
-        uses: actions/download-artifact@v8
-        with:
-          name: bun-lambda-layer-${{ inputs.version }}
-          path: lib
-
-      - name: Trigger release workflow
-        uses: actions/github-script@v7
-        with:
-          script: |
-            await github.rest.actions.createWorkflowDispatch({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: 'release.yml',
-              ref: 'main',
-              inputs: {
-                version: '${{ inputs.version }}'
-              }
-            });
+            [Workflow Run]: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          add-paths: |
+            .bun-version
+            src/index.ts
+            README.md
+            lib/bun-lambda-layer-*.zip
