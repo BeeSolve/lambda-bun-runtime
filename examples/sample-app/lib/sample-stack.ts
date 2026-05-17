@@ -24,6 +24,15 @@ export class SampleStack extends Stack {
       authType: lambda.FunctionUrlAuthType.NONE,
     });
 
+    // HTTP v2 plain (raw event, no adapter) — Function URL
+    const httpV2PlainFn = new BunFunction(this, "HttpV2PlainFn", {
+      entrypoint: src("http-v2-plain.ts"),
+      bunLayer,
+    });
+    const plainFnUrl = httpV2PlainFn.addFunctionUrl({
+      authType: lambda.FunctionUrlAuthType.NONE,
+    });
+
     // HTTP v1 — REST API
     const httpV1Fn = new BunFunction(this, "HttpV1Fn", {
       entrypoint: src("http-v1.ts"),
@@ -60,6 +69,7 @@ export class SampleStack extends Stack {
     );
 
     new CfnOutput(this, "HttpV2FunctionUrl", { value: fnUrl.url });
+    new CfnOutput(this, "HttpV2PlainFunctionUrl", { value: plainFnUrl.url });
     new CfnOutput(this, "HttpV1RestApiUrl", { value: restApi.url });
     new CfnOutput(this, "EchoFnArn", { value: echoFn.functionArn });
     new CfnOutput(this, "S3WriterFnArn", { value: s3WriterFn.functionArn });

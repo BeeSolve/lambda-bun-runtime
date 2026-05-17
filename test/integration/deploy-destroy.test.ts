@@ -21,6 +21,7 @@ function describeInteg(label: string, fn: () => void) {
 
 interface StackOutputs {
   HttpV2FunctionUrl: string;
+  HttpV2PlainFunctionUrl: string;
   HttpV1RestApiUrl: string;
   EchoFnArn: string;
   S3WriterFnArn: string;
@@ -97,6 +98,17 @@ describeInteg(
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body.eventVersion).toBe("v2");
+      expect(body.requestCookie).toBe("from-client");
+      assertSetCookieHeader(res.headers);
+    });
+
+    test("HTTP v2 plain (raw event, no adapter) handles cookies", async () => {
+      const res = await fetch(`${outputs.HttpV2PlainFunctionUrl}cookie-check`, {
+        headers: { Cookie: "it_cookie=from-client" },
+      });
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.eventVersion).toBe("v2-plain");
       expect(body.requestCookie).toBe("from-client");
       assertSetCookieHeader(res.headers);
     });

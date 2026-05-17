@@ -40,13 +40,14 @@
       "name": "sample-app",
       "dependencies": {
         "@beesolve/lambda-bun-runtime": "file:../..",
-        "@beesolve/lambda-fetch-api": "latest",
+        "@beesolve/lambda-fetch-api": "^1.0.0",
         "aws-cdk-lib": "^2.238.0",
         "constructs": "^10.4.5",
       },
       "devDependencies": {
         "@aws-sdk/client-lambda": "^3",
         "@aws-sdk/client-s3": "^3",
+        "@types/aws-lambda": "^8",
         "aws-cdk": "^2.238.0",
       },
     },
@@ -134,7 +135,7 @@
 
     "@beesolve/lambda-bun-runtime": ["@beesolve/lambda-bun-runtime@root:", {}],
 
-    "@beesolve/lambda-fetch-api": ["@beesolve/lambda-fetch-api@0.1.8", "", { "dependencies": { "@beesolve/helpers": "^0.1.4" }, "peerDependencies": { "typescript": "^6.0.3" }, "optionalPeers": ["typescript"] }, "sha512-3G6+EnZgUVyTuK/ISPlc1PaFyAsRk6P3jhlyocEwr8XixoIjNIHYVmyjPwvaGqZErAAt3hwyyfKE3aG3Oz8YUQ=="],
+    "@beesolve/lambda-fetch-api": ["@beesolve/lambda-fetch-api@1.0.0", "", { "dependencies": { "@beesolve/helpers": "^0.1.6" }, "peerDependencies": { "typescript": "^6.0.3" }, "optionalPeers": ["typescript"] }, "sha512-RIMIAhmpP5YTkNcuIjE1H3GvXXGPbVKUVsS9apbzzH8AZPpYzujKeQC7e+r4VBD2uVb4I4ZFyY24BG4QK8OF7A=="],
 
     "@cspotcode/source-map-support": ["@cspotcode/source-map-support@0.8.1", "", { "dependencies": { "@jridgewell/trace-mapping": "0.3.9" } }, "sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw=="],
 
@@ -223,6 +224,8 @@
     "@tsconfig/node16": ["@tsconfig/node16@1.0.4", "", {}, "sha512-vxhUy4J8lyeyinH7Azl1pdd43GJhZH/tP2weN8TntQblOY+A0XbT8DJk1/oCPuOOyg/Ja757rG0CgHcWC8OfMA=="],
 
     "@tybys/wasm-util": ["@tybys/wasm-util@0.10.1", "", { "dependencies": { "tslib": "^2.4.0" } }, "sha512-9tTaPJLSiejZKx+Bmog4uSubteqTvFrVrURwkmHixBo0G4seD0zUxp98E1DzUBJxLQ3NPwXrGKDiVjwx/DpPsg=="],
+
+    "@types/aws-lambda": ["@types/aws-lambda@8.10.161", "", {}, "sha512-rUYdp+MQwSFocxIOcSsYSF3YYYC/uUpMbCY/mbO21vGqfrEYvNSoPyKYDj6RhXXpPfS0KstW9RwG3qXh9sL7FQ=="],
 
     "@types/bun": ["@types/bun@1.3.14", "", { "dependencies": { "bun-types": "1.3.14" } }, "sha512-h1hFqFVcvAvD9j9K7ZW7vd82aSA+rTdznZa+5bwvCwqSB1jmmfLcbIWhOLx1/+boy/xmjgCs/OMUL8hRJSmnPw=="],
 

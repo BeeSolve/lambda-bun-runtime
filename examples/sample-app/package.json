@@ -9,13 +9,14 @@
   },
   "dependencies": {
     "@beesolve/lambda-bun-runtime": "file:../..",
-    "@beesolve/lambda-fetch-api": "latest",
+    "@beesolve/lambda-fetch-api": "^1.0.0",
     "aws-cdk-lib": "^2.238.0",
     "constructs": "^10.4.5"
   },
   "devDependencies": {
     "@aws-sdk/client-lambda": "^3",
     "@aws-sdk/client-s3": "^3",
+    "@types/aws-lambda": "^8",
     "aws-cdk": "^2.238.0"
   }
 }

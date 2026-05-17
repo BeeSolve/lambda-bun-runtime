@@ -53,6 +53,68 @@ export const handler = async (event: unknown, context: unknown) => {
 
 This is a deliberate design choice. See [Why raw events?](#why-raw-events) below.
 
+### HTTP API v2 (Function URL or HTTP API Gateway)
+
+Install `@types/aws-lambda` for typed event and result shapes:
+
+```bash
+npm i -D @types/aws-lambda
+```
+
+```ts
+import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from "aws-lambda";
+
+export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGatewayProxyResultV2> => {
+  const name = event.queryStringParameters?.name ?? "world";
+  return {
+    statusCode: 200,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message: `Hello, ${name}!` }),
+  };
+};
+```
+
+Set-Cookie headers use the top-level `cookies` array in v2 responses:
+
+```ts
+return {
+  statusCode: 200,
+  cookies: ["session=abc123; Path=/; HttpOnly; SameSite=Lax"],
+  body: "ok",
+};
+```
+
+### REST API (v1)
+
+```ts
+import type { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
+
+export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
+  const name = event.queryStringParameters?.name ?? "world";
+  return {
+    statusCode: 200,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ message: `Hello, ${name}!` }),
+  };
+};
+```
+
+### Other triggers (SQS, S3, EventBridge, …)
+
+The same `(event, context)` pattern works for any Lambda trigger. Import the matching type from `@types/aws-lambda`:
+
+```ts
+import type { SQSEvent, SQSBatchResponse } from "aws-lambda";
+
+export const handler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
+  const failures = [];
+  for (const record of event.Records) {
+    // process record...
+  }
+  return { batchItemFailures: failures };
+};
+```
+
 ## Fetch API Support
 
 This runtime passes raw Lambda events directly to your handler. It does **not** convert events to Fetch API `Request`/`Response` objects.
@@ -65,7 +127,7 @@ If you want to write handlers using the Fetch API — for example to share code 
 npm i @beesolve/lambda-fetch-api
 ```
 
-### Usage with `asHttpV2Handler`
+### HTTP API v2 / Function URL
 
 The recommended pattern exports both a `fetch` function (for local development with `bun run --serve`) and a `handler` function (for Lambda) from the same file:
 
@@ -82,6 +144,96 @@ export default { fetch };
 ```
 
 This dual-export pattern lets you run the same file locally and deploy it to Lambda without changes.
+
+### REST API (v1)
+
+```ts
+import { asHttpV1Handler } from '@beesolve/lambda-fetch-api';
+
+const fetch = async (request: Request): Promise<Response> => {
+  const url = new URL(request.url);
+  return Response.json({ path: url.pathname });
+};
+
+export const handler = asHttpV1Handler(fetch);
+export default { fetch };
+```
+
+### Response streaming
+
+```ts
+import { asResponseStreamHandler } from '@beesolve/lambda-fetch-api';
+
+export const handler = asResponseStreamHandler(async () => {
+  const stream = new ReadableStream({
+    async start(controller) {
+      controller.enqueue("chunk one\n");
+      controller.enqueue("chunk two\n");
+      controller.close();
+    },
+  });
+  return new Response(stream, { headers: { "content-type": "text/plain" } });
+});
+```
+
+### Accessing the raw AWS event and context
+
+The original event and context are stored per-invocation via `AsyncLocalStorage`. Call the getters from anywhere inside your handler — no need to thread parameters:
+
+```ts
+import { asHttpV2Handler, getAwsV2Event, getAwsContext } from '@beesolve/lambda-fetch-api';
+
+export const handler = asHttpV2Handler(async (request) => {
+  const event = getAwsV2Event();    // APIGatewayProxyEventV2
+  const context = getAwsContext();   // Context
+
+  console.log(event.requestContext.requestId);
+  console.log(context.getRemainingTimeInMillis());
+
+  return new Response("ok");
+});
+```
+
+| Getter | Returns |
+|---|---|
+| `getAwsEvent()` | `APIGatewayProxyEvent \| APIGatewayProxyEventV2` — auto-detected |
+| `getAwsV1Event()` | `APIGatewayProxyEvent` — throws if event is v2 |
+| `getAwsV2Event()` | `APIGatewayProxyEventV2` — throws if event is v1 |
+| `getAwsContext()` | `Context` |
+
+All getters throw `NotInHandlerContextError` if called outside a handler invocation.
+
+### Authorizer-aware handlers
+
+For routes protected by a Lambda authorizer, use the narrowed handler variants:
+
+```ts
+import { asLambdaAuthorizedHttpV2Handler, getAwsLambdaAuthorizerContext } from '@beesolve/lambda-fetch-api';
+import * as v from 'valibot';
+
+const AuthSchema = v.object({ userId: v.string(), role: v.string() });
+
+export const handler = asLambdaAuthorizedHttpV2Handler(async (request) => {
+  const auth = await getAwsLambdaAuthorizerContext(AuthSchema);
+  return Response.json({ user: auth.userId });
+});
+```
+
+The v1 equivalent is `asCustomAuthorizedHttpV1Handler` / `getAwsCustomAuthorizerContext`. Any [Standard Schema](https://standardschema.dev/)-compatible library (Zod, Valibot, ArkType) works for validating the payload.
+
+### Type guards
+
+```ts
+import { getAwsEvent, isAPIGatewayProxyEventV2 } from '@beesolve/lambda-fetch-api';
+
+const event = getAwsEvent();
+
+if (isAPIGatewayProxyEventV2(event)) {
+  console.log(event.rawPath);  // APIGatewayProxyEventV2
+} else {
+  console.log(event.path);     // APIGatewayProxyEvent
+}
+```
 
 ## WebSocket Support
 
@@ -153,6 +305,8 @@ export const handler = asHttpV2Handler(fetch);
 // Keep for local development with `bun run --serve`
 export default { fetch };
 ```
+
+Use `asHttpV1Handler` instead if your API is backed by API Gateway v1 (REST API).
 
 ### Summary of changes
 
