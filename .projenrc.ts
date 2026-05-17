@@ -69,7 +69,7 @@ if (workflowFile != null) {
     {
       name: "Generate token",
       id: "app-token",
-      uses: "actions/create-github-app-token@v2",
+      uses: "actions/create-github-app-token@v3",
       with: {
         "app-id": "${{ secrets.APP_ID }}",
         "private-key": "${{ secrets.APP_PRIVATE_KEY }}",
@@ -131,7 +131,7 @@ if (upgradeWorkflowFile != null) {
     {
       name: "Generate token",
       id: "app-token",
-      uses: "actions/create-github-app-token@v2",
+      uses: "actions/create-github-app-token@v3",
       with: {
         "app-id": "${{ secrets.APP_ID }}",
         "private-key": "${{ secrets.APP_PRIVATE_KEY }}",
