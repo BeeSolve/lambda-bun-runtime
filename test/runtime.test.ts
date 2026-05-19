@@ -481,6 +481,140 @@ describe("runtime edge cases (Task 1.5)", () => {
   });
 });
 
+describe("streaming response", () => {
+  test("ReadableStream return value sends streaming headers and body", async () => {
+    const tmpDir = "/tmp/test-streaming-readable";
+    mkdirSync(tmpDir, { recursive: true });
+    writeFileSync(
+      `${tmpDir}/streamer.js`,
+      `export const handler = async () => {
+        const { readable, writable } = new TransformStream();
+        const writer = writable.getWriter();
+        const encoder = new TextEncoder();
+        writer.write(encoder.encode("hello "));
+        writer.write(encoder.encode("world"));
+        writer.close();
+        return readable;
+      };`,
+    );
+
+    const port = 19260;
+    let responseBody: string | null = null;
+    let streamingHeader: string | null = null;
+
+    const server = Bun.serve({
+      port,
+      fetch(req) {
+        const url = new URL(req.url);
+        if (url.pathname === "/2018-06-01/runtime/invocation/next") {
+          return new Response(JSON.stringify({}), {
+            headers: {
+              "Lambda-Runtime-Aws-Request-Id": "req-stream-1",
+              "Lambda-Runtime-Invoked-Function-Arn": "arn:test",
+              "Lambda-Runtime-Deadline-Ms": String(Date.now() + 30000),
+            },
+          });
+        }
+        if (url.pathname.endsWith("/response")) {
+          streamingHeader = req.headers.get(
+            "Lambda-Runtime-Function-Response-Mode",
+          );
+          return req.text().then((body) => {
+            responseBody = body;
+            return new Response("OK");
+          });
+        }
+        return new Response("OK");
+      },
+    });
+
+    const proc = spawn(["bun", "command/runtime.mts"], {
+      env: {
+        ...process.env,
+        AWS_LAMBDA_RUNTIME_API: `127.0.0.1:${port}`,
+        _HANDLER: "streamer.handler",
+        LAMBDA_TASK_ROOT: tmpDir,
+      },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+
+    await waitFor({ condition: () => responseBody != null, timeoutMs: 5000 });
+    proc.kill();
+    await proc.exited;
+    server.stop();
+
+    expect(streamingHeader).toBe("streaming");
+    expect(responseBody).toBe("hello world");
+
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  test("AsyncGenerator return value sends streaming headers and body", async () => {
+    const tmpDir = "/tmp/test-streaming-generator";
+    mkdirSync(tmpDir, { recursive: true });
+    writeFileSync(
+      `${tmpDir}/gen.js`,
+      `export async function* handler() {
+        yield "chunk1";
+        yield "chunk2";
+        yield "chunk3";
+      }`,
+    );
+
+    const port = 19261;
+    let responseBody: string | null = null;
+    let streamingHeader: string | null = null;
+
+    const server = Bun.serve({
+      port,
+      fetch(req) {
+        const url = new URL(req.url);
+        if (url.pathname === "/2018-06-01/runtime/invocation/next") {
+          return new Response(JSON.stringify({}), {
+            headers: {
+              "Lambda-Runtime-Aws-Request-Id": "req-stream-2",
+              "Lambda-Runtime-Invoked-Function-Arn": "arn:test",
+              "Lambda-Runtime-Deadline-Ms": String(Date.now() + 30000),
+            },
+          });
+        }
+        if (url.pathname.endsWith("/response")) {
+          streamingHeader = req.headers.get(
+            "Lambda-Runtime-Function-Response-Mode",
+          );
+          return req.text().then((body) => {
+            responseBody = body;
+            return new Response("OK");
+          });
+        }
+        return new Response("OK");
+      },
+    });
+
+    const proc = spawn(["bun", "command/runtime.mts"], {
+      env: {
+        ...process.env,
+        AWS_LAMBDA_RUNTIME_API: `127.0.0.1:${port}`,
+        _HANDLER: "gen.handler",
+        LAMBDA_TASK_ROOT: tmpDir,
+      },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+
+    await waitFor({ condition: () => responseBody != null, timeoutMs: 5000 });
+    proc.kill();
+    await proc.exited;
+    server.stop();
+
+    expect(streamingHeader).toBe("streaming");
+    expect(responseBody).toBe("chunk1chunk2chunk3");
+
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+});
+
 describe("event passthrough (Property 2)", () => {
   test("preserves arbitrary JSON data through handler", async () => {
     const tmpDir = "/tmp/test-passthrough";

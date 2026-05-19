@@ -115,6 +115,42 @@ export const handler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
 };
 ```
 
+### Response Streaming
+
+Return a `ReadableStream<Uint8Array>` or any `AsyncIterable<Uint8Array | string>` (including async generators) to stream the response. The runtime detects the return type automatically and sends it using HTTP chunked transfer encoding with the `Lambda-Runtime-Function-Response-Mode: streaming` header — no wrapper or import required.
+
+**Async generator (simplest):**
+
+```ts
+export async function* handler() {
+  yield "chunk one\n";
+  yield "chunk two\n";
+  yield "chunk three\n";
+}
+```
+
+**`ReadableStream`:**
+
+```ts
+export const handler = async () => {
+  const encoder = new TextEncoder();
+  const { readable, writable } = new TransformStream();
+  const writer = writable.getWriter();
+
+  (async () => {
+    await writer.write(encoder.encode("chunk one\n"));
+    await writer.write(encoder.encode("chunk two\n"));
+    await writer.close();
+  })();
+
+  return readable;
+};
+```
+
+Invoke streaming functions using the AWS SDK's `InvokeWithResponseStream` API, or expose them via a Function URL with `invokeMode: InvokeMode.RESPONSE_STREAM`.
+
+For HTTP streaming with custom status codes and response headers (e.g., `Content-Type: text/event-stream`), use [`asResponseStreamHandler`](#response-streaming-1) from `@beesolve/lambda-fetch-api`, which handles the HTTP metadata framing required by Function URLs.
+
 ## Fetch API Support
 
 This runtime passes raw Lambda events directly to your handler. It does **not** convert events to Fetch API `Request`/`Response` objects.

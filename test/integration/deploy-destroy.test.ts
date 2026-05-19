@@ -1,7 +1,7 @@
 import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { InvokeCommand, LambdaClient } from "@aws-sdk/client-lambda";
+import { InvokeCommand, InvokeWithResponseStreamCommand, LambdaClient } from "@aws-sdk/client-lambda";
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
@@ -26,6 +26,7 @@ interface StackOutputs {
   EchoFnArn: string;
   S3WriterFnArn: string;
   TestBucketName: string;
+  StreamingFnArn: string;
 }
 
 function run(cmd: string, cwd = SAMPLE_APP) {
@@ -127,6 +128,24 @@ describeInteg(
     test("direct invoke echo", async () => {
       const result = await invokeLambda(outputs.EchoFnArn, { hello: "world" });
       expect((result as { echo: unknown }).echo).toEqual({ hello: "world" });
+    });
+
+    test("async generator handler streams response via InvokeWithResponseStream", async () => {
+      const client = new LambdaClient({ region: REGION });
+      const res = await client.send(
+        new InvokeWithResponseStreamCommand({
+          FunctionName: outputs.StreamingFnArn,
+          Payload: Buffer.from("{}"),
+        }),
+      );
+      const decoder = new TextDecoder();
+      let body = "";
+      for await (const chunk of res.EventStream!) {
+        if (chunk.PayloadChunk?.Payload) {
+          body += decoder.decode(chunk.PayloadChunk.Payload);
+        }
+      }
+      expect(body).toBe("hello from streaming");
     });
 
     test("Bun-native S3 write", async () => {

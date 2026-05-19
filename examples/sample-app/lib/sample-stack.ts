@@ -49,6 +49,12 @@ export class SampleStack extends Stack {
       bunLayer,
     });
 
+    // Streaming — async generator handler, invoked via InvokeWithResponseStream
+    const streamingFn = new BunFunction(this, "StreamingFn", {
+      entrypoint: src("streaming.ts"),
+      bunLayer,
+    });
+
     // S3 writer — direct invoke, Bun-native S3
     const testBucket = new s3.Bucket(this, "TestBucket", {
       autoDeleteObjects: true,
@@ -74,5 +80,6 @@ export class SampleStack extends Stack {
     new CfnOutput(this, "EchoFnArn", { value: echoFn.functionArn });
     new CfnOutput(this, "S3WriterFnArn", { value: s3WriterFn.functionArn });
     new CfnOutput(this, "TestBucketName", { value: testBucket.bucketName });
+    new CfnOutput(this, "StreamingFnArn", { value: streamingFn.functionArn });
   }
 }

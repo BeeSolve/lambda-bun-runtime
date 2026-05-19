@@ -32,6 +32,8 @@
   "include": [
     "src/**/*.ts",
     "test/**/*.ts",
+    "command/**/*.ts",
+    "command/**/*.mts",
     ".projenrc.ts",
     "projenrc/**/*.ts"
   ],

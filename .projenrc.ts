@@ -108,6 +108,9 @@ if (workflowFile != null) {
   ]);
 }
 
+project.tsconfigDev.addInclude("command/**/*.ts");
+project.tsconfigDev.addInclude("command/**/*.mts");
+
 project.eslint?.addOverride({
   files: ["test/**/*.ts"],
   rules: {
