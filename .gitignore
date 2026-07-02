@@ -39,12 +39,13 @@ jspm_packages/
 !/.prettierignore
 !/.prettierrc.json
 !/test/
-!/tsconfig.dev.json
+!/tsconfig.json
+!/test/tsconfig.json
 !/src/
 /dist/
 !/.eslintrc.json
+!/projenrc/tsconfig.json
 .jsii
-tsconfig.json
 !/API.md
 /lib/*
 !.bun-version
