@@ -58,11 +58,11 @@ Save as `trust.json`, replacing `<ACCOUNT_ID>` with your AWS account ID:
 
 CDK's bootstrap creates three intermediate roles that do the heavy lifting:
 
-| Bootstrap role | Purpose |
-|---|---|
-| `cdk-*-deploy-role-ACCOUNT-REGION` | CDK CLI assumes this to submit stacks to CloudFormation |
+| Bootstrap role                              | Purpose                                                         |
+| ------------------------------------------- | --------------------------------------------------------------- |
+| `cdk-*-deploy-role-ACCOUNT-REGION`          | CDK CLI assumes this to submit stacks to CloudFormation         |
 | `cdk-*-file-publishing-role-ACCOUNT-REGION` | Uploads Lambda zips and layer assets to the bootstrap S3 bucket |
-| `cdk-*-cfn-exec-role-ACCOUNT-REGION` | Passed to CloudFormation; actually creates all resources |
+| `cdk-*-cfn-exec-role-ACCOUNT-REGION`        | Passed to CloudFormation; actually creates all resources        |
 
 The GitHub Actions role only needs to **assume those bootstrap roles** plus call a handful of APIs directly (test invocations, stack listing for cleanup). All resource creation goes through the CloudFormation execution role, not through the CI role.
 
@@ -111,17 +111,14 @@ Save as `gh-integ-policy.json`, replacing `<ACCOUNT_ID>` throughout:
     {
       "Sid": "IntegTestS3Read",
       "Effect": "Allow",
-      "Action": [
-        "s3:GetObject",
-        "s3:ListBucket"
-      ],
+      "Action": ["s3:GetObject", "s3:ListBucket"],
       "Resource": "*"
     }
   ]
 }
 ```
 
-> **Note on `IntegTestS3Read`:** CDK generates random bucket names so we cannot predict the ARN at policy-authoring time. The scope is limited in practice — the role cannot create or delete S3 buckets directly (only through the CDK execution role), so read access to `*` is acceptable. If you want to tighten this further, name the bucket explicitly in `sample-stack.ts` using a stable prefix (e.g. `bucketName: \`bun-integ-\${this.stackName}\``) and change the resource to `arn:aws:s3:::bun-integ-BunLayerInteg-*/*`.
+> **Note on `IntegTestS3Read`:** CDK generates random bucket names so we cannot predict the ARN at policy-authoring time. The scope is limited in practice — the role cannot create or delete S3 buckets directly (only through the CDK execution role), so read access to `*` is acceptable. If you want to tighten this further, name the bucket explicitly in `sample-stack.ts` using a stable prefix (e.g. `bucketName: \`bun-integ-\${this.stackName}\``) and change the resource to `arn:aws:s3:::bun-integ-BunLayerInteg-_/_`.
 
 ### Create the role and attach the policy
 
@@ -228,7 +225,7 @@ Save as `cfn-exec-policy.json`, replacing `<ACCOUNT_ID>` throughout. This covers
 }
 ```
 
-> **Note on `S3TestBucket`:** The CDK-generated bucket name is random, so this policy requires naming the bucket explicitly. In `sample-stack.ts`, set `bucketName: \`bun-integ-${this.stackName}\`` on the `TestBucket` construct, then update `IntegTestS3Read` in the GitHub Actions role policy to match.
+> **Note on `S3TestBucket`:** The CDK-generated bucket name is random, so this policy requires naming the bucket explicitly. In `sample-stack.ts`, set `bucketName: \`bun-integ-${this.stackName}\``on the`TestBucket`construct, then update`IntegTestS3Read` in the GitHub Actions role policy to match.
 
 Then create the managed policy and re-bootstrap:
 
@@ -256,10 +253,7 @@ Add this statement to the policy document in `/tmp/policy.json`, then apply it:
   "Effect": "Allow",
   "Principal": { "Service": "access-analyzer.amazonaws.com" },
   "Action": ["s3:GetObject", "s3:ListBucket"],
-  "Resource": [
-    "arn:aws:s3:::YOUR-CLOUDTRAIL-BUCKET",
-    "arn:aws:s3:::YOUR-CLOUDTRAIL-BUCKET/*"
-  ],
+  "Resource": ["arn:aws:s3:::YOUR-CLOUDTRAIL-BUCKET", "arn:aws:s3:::YOUR-CLOUDTRAIL-BUCKET/*"],
   "Condition": {
     "StringEquals": { "aws:SourceAccount": "<ACCOUNT_ID>" }
   }

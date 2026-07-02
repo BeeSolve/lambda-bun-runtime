@@ -19,12 +19,18 @@ describe("version parameter precedence (Property 6)", () => {
     expect(output).toContain("1.0.999");
   });
 
-  test("exits with error when both are absent", () => {
+  test("falls back to src/index.ts version when both are absent", () => {
+    // The script resolves 1.3.14 from src/index.ts and starts downloading.
+    // We don't wait for the full download — just verify it found the right version.
+    // Use a fake non-downloadable version by temporarily patching would be complex,
+    // so instead we rely on the output showing the resolved version.
     const proc = Bun.spawnSync(["bun", "command/buildLayer.ts"], {
       env: { ...process.env, BUN_VERSION: undefined },
+      timeout: 3000,
     });
-    expect(proc.exitCode).not.toBe(0);
-    expect(proc.stderr.toString()).toContain("No Bun version specified");
+    const output = proc.stdout.toString() + proc.stderr.toString();
+    // The script should print "Downloading Bun v1.3.14" proving it read src/index.ts
+    expect(output).toContain("1.3.14");
   });
 });
 
@@ -68,14 +74,6 @@ describe("semver validation (Property 7)", () => {
 });
 
 describe("build layer script unit tests (Task 2.5)", () => {
-  test("exits with error for missing version", () => {
-    const proc = Bun.spawnSync(["bun", "command/buildLayer.ts"], {
-      env: { ...process.env, BUN_VERSION: undefined },
-    });
-    expect(proc.exitCode).not.toBe(0);
-    expect(proc.stderr.toString()).toContain("No Bun version specified");
-  });
-
   test("exits with error for invalid version format", () => {
     const proc = Bun.spawnSync(["bun", "command/buildLayer.ts", "invalid"], {
       env: process.env,

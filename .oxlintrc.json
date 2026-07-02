@@ -1,0 +1,4 @@
+{
+  "extends": ["./node_modules/@beesolve/lint-config/presets/package.oxlintrc.json"],
+  "ignorePatterns": ["dist/", "node_modules/", "lib/"]
+}

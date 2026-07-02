@@ -1,22 +1,23 @@
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import { execSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+
 import {
   InvokeCommand,
   InvokeWithResponseStreamCommand,
   LambdaClient,
 } from "@aws-sdk/client-lambda";
 import { GetObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 
-const RUN_INTEG = process.env.RUN_AWS_INTEG === "1";
-const REGION = process.env.AWS_REGION ?? "eu-central-1";
-const STACK_NAME = `BunLayerInteg-${Date.now()}`;
-const SAMPLE_APP = join(__dirname, "../../examples/sample-app");
-const OUTPUTS_FILE = join(SAMPLE_APP, "outputs.json");
+const runInteg = process.env.RUN_AWS_INTEG === "1";
+const region = process.env.AWS_REGION ?? "eu-central-1";
+const stackName = `BunLayerInteg-${Date.now()}`;
+const sampleApp = join(__dirname, "../../examples/sample-app");
+const outputsFile = join(sampleApp, "outputs.json");
 
 function describeInteg(label: string, fn: () => void) {
-  if (!RUN_INTEG) {
+  if (!runInteg) {
     describe.skip(`[skipped — set RUN_AWS_INTEG=1] ${label}`, fn);
   } else {
     describe(label, fn);
@@ -33,16 +34,16 @@ interface StackOutputs {
   StreamingFnArn: string;
 }
 
-function run(cmd: string, cwd = SAMPLE_APP) {
+function run(cmd: string, cwd = sampleApp) {
   execSync(cmd, {
     cwd,
     stdio: "inherit",
-    env: { ...process.env, INTEG_STACK_NAME: STACK_NAME },
+    env: { ...process.env, INTEG_STACK_NAME: stackName },
   });
 }
 
 async function invokeLambda(arn: string, payload: unknown): Promise<unknown> {
-  const client = new LambdaClient({ region: REGION });
+  const client = new LambdaClient({ region: region });
   const res = await client.send(
     new InvokeCommand({
       FunctionName: arn,
@@ -53,10 +54,8 @@ async function invokeLambda(arn: string, payload: unknown): Promise<unknown> {
 }
 
 async function getS3Object(bucket: string, key: string): Promise<string> {
-  const client = new S3Client({ region: REGION });
-  const res = await client.send(
-    new GetObjectCommand({ Bucket: bucket, Key: key }),
-  );
+  const client = new S3Client({ region: region });
+  const res = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
   return res.Body!.transformToString();
 }
 
@@ -74,11 +73,9 @@ describeInteg(
     beforeAll(
       async () => {
         run("bun install");
-        run(
-          `bunx cdk deploy ${STACK_NAME} --require-approval never --outputs-file outputs.json`,
-        );
-        const raw = JSON.parse(readFileSync(OUTPUTS_FILE, "utf8"));
-        outputs = raw[STACK_NAME] as StackOutputs;
+        run(`bunx cdk deploy ${stackName} --require-approval never --outputs-file outputs.json`);
+        const raw = JSON.parse(readFileSync(outputsFile, "utf8"));
+        outputs = raw[stackName] as StackOutputs;
       },
       20 * 60 * 1000,
     );
@@ -86,10 +83,10 @@ describeInteg(
     afterAll(
       async () => {
         try {
-          run(`bunx cdk destroy ${STACK_NAME} --force`);
+          run(`bunx cdk destroy ${stackName} --force`);
         } catch {
           console.warn(
-            `Stack destroy failed — run 'bun run integ:cleanup' to clean up ${STACK_NAME}`,
+            `Stack destroy failed — run 'bun run integ:cleanup' to clean up ${stackName}`,
           );
         }
       },
@@ -135,7 +132,7 @@ describeInteg(
     });
 
     test("async generator handler streams response via InvokeWithResponseStream", async () => {
-      const client = new LambdaClient({ region: REGION });
+      const client = new LambdaClient({ region: region });
       const res = await client.send(
         new InvokeWithResponseStreamCommand({
           FunctionName: outputs.StreamingFnArn,
@@ -157,10 +154,7 @@ describeInteg(
         key: "integ-test.txt",
         content: "hello bun",
       });
-      const content = await getS3Object(
-        outputs.TestBucketName,
-        "integ-test.txt",
-      );
+      const content = await getS3Object(outputs.TestBucketName, "integ-test.txt");
       expect(content).toBe("hello bun");
     });
   },

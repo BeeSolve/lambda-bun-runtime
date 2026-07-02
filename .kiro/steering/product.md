@@ -15,5 +15,5 @@
 - No Fetch API conversion — raw Lambda events are passed directly to handlers
 - Fetch API support is a separate companion package (`@beesolve/lambda-fetch-api`)
 - ARM64-only architecture
-- Published as a jsii library (polyglot CDK construct)
+- ESM-only package, TypeScript CDK construct library
 - MIT licensed, published to npm under `@beesolve` scope

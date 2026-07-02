@@ -1,4 +1,5 @@
 import { App } from "aws-cdk-lib";
+
 import { SampleStack } from "../lib/sample-stack";
 
 const app = new App();

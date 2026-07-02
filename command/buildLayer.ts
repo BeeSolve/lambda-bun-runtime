@@ -11,24 +11,16 @@
  *   2. BUN_VERSION environment variable
  */
 
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+
 import { Glob } from "bun";
 
 async function main(): Promise<void> {
   const version = resolveVersion();
   validateVersion({ version });
 
-  const tmpDir = join(
-    resolve(import.meta.dir, "..", ".build-tmp"),
-    "layer-build",
-  );
+  const tmpDir = join(resolve(import.meta.dir, "..", ".build-tmp"), "layer-build");
   if (existsSync(tmpDir)) {
     rmSync(tmpDir, { recursive: true, force: true });
   }
@@ -58,12 +50,11 @@ async function main(): Promise<void> {
 function resolveVersion(): string {
   const cliArg = process.argv[2];
   const envVar = process.env.BUN_VERSION;
-  if (cliArg ?? envVar) return (cliArg ?? envVar)!;
+  if (cliArg != null) return cliArg;
+  if (envVar != null) return envVar;
 
   const srcPath = resolve(import.meta.dir, "..", "src", "index.ts");
-  const match = readFileSync(srcPath, "utf8").match(
-    /const bunVersion = "([^"]+)"/,
-  );
+  const match = readFileSync(srcPath, "utf8").match(/const bunVersion = "([^"]+)"/);
   if (match) return match[1];
 
   console.error(
@@ -76,17 +67,12 @@ function validateVersion(props: { version: string }): void {
   const semverPattern = /^([1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 
   if (!semverPattern.test(props.version)) {
-    console.error(
-      `Invalid version format: ${props.version}. Expected semver (e.g., 1.3.13).`,
-    );
+    console.error(`Invalid version format: ${props.version}. Expected semver (e.g., 1.3.13).`);
     process.exit(1);
   }
 }
 
-async function downloadBunBinary(props: {
-  version: string;
-  tmpDir: string;
-}): Promise<string> {
+async function downloadBunBinary(props: { version: string; tmpDir: string }): Promise<string> {
   const url = `https://github.com/oven-sh/bun/releases/download/bun-v${props.version}/bun-linux-aarch64.zip`;
 
   console.log(`Downloading Bun v${props.version} from ${url}...`);
@@ -99,9 +85,7 @@ async function downloadBunBinary(props: {
 
   if (!response.ok) {
     if (response.status === 404) {
-      console.error(
-        `Failed to download Bun v${props.version}: release not found.`,
-      );
+      console.error(`Failed to download Bun v${props.version}: release not found.`);
     } else {
       console.error(
         `Failed to download Bun v${props.version}: HTTP ${response.status} ${response.statusText}`,
@@ -117,24 +101,13 @@ async function downloadBunBinary(props: {
   return zipPath;
 }
 
-async function extractBunBinary(props: {
-  zipPath: string;
-  tmpDir: string;
-}): Promise<string> {
+async function extractBunBinary(props: { zipPath: string; tmpDir: string }): Promise<string> {
   console.log("Extracting Bun binary...");
 
-  const proc = Bun.spawnSync([
-    "unzip",
-    "-o",
-    props.zipPath,
-    "-d",
-    props.tmpDir,
-  ]);
+  const proc = Bun.spawnSync(["unzip", "-o", props.zipPath, "-d", props.tmpDir]);
 
   if (proc.exitCode !== 0) {
-    console.error(
-      `Failed to extract Bun binary: ${proc.stderr.toString().trim()}`,
-    );
+    console.error(`Failed to extract Bun binary: ${proc.stderr.toString().trim()}`);
     process.exit(1);
   }
 
@@ -145,9 +118,7 @@ async function extractBunBinary(props: {
     }
   }
 
-  console.error(
-    "Failed to extract Bun binary: bun executable not found in archive.",
-  );
+  console.error("Failed to extract Bun binary: bun executable not found in archive.");
   process.exit(1);
 }
 
@@ -213,31 +184,19 @@ async function createLayerZip(props: {
   const stageDir = join(resolve(import.meta.dir, "..", ".build-tmp"), "stage");
   mkdirSync(stageDir, { recursive: true });
 
-  const cpBun = Bun.spawnSync([
-    "cp",
-    props.bunBinaryPath,
-    join(stageDir, "bun"),
-  ]);
+  const cpBun = Bun.spawnSync(["cp", props.bunBinaryPath, join(stageDir, "bun")]);
   if (cpBun.exitCode !== 0) {
     console.error("Failed to create layer zip: could not copy bun binary");
     process.exit(1);
   }
 
-  const cpRuntime = Bun.spawnSync([
-    "cp",
-    props.runtimePath,
-    join(stageDir, "runtime.js"),
-  ]);
+  const cpRuntime = Bun.spawnSync(["cp", props.runtimePath, join(stageDir, "runtime.js")]);
   if (cpRuntime.exitCode !== 0) {
     console.error("Failed to create layer zip: could not copy runtime.js");
     process.exit(1);
   }
 
-  const cpBootstrap = Bun.spawnSync([
-    "cp",
-    props.bootstrapPath,
-    join(stageDir, "bootstrap"),
-  ]);
+  const cpBootstrap = Bun.spawnSync(["cp", props.bootstrapPath, join(stageDir, "bootstrap")]);
   if (cpBootstrap.exitCode !== 0) {
     console.error("Failed to create layer zip: could not copy bootstrap");
     process.exit(1);
@@ -246,15 +205,12 @@ async function createLayerZip(props: {
   Bun.spawnSync(["chmod", "+x", join(stageDir, "bun")]);
   Bun.spawnSync(["chmod", "+x", join(stageDir, "bootstrap")]);
 
-  const zipProc = Bun.spawnSync(
-    ["zip", "-j", outputZip, "bootstrap", "bun", "runtime.js"],
-    { cwd: stageDir },
-  );
+  const zipProc = Bun.spawnSync(["zip", "-j", outputZip, "bootstrap", "bun", "runtime.js"], {
+    cwd: stageDir,
+  });
 
   if (zipProc.exitCode !== 0) {
-    console.error(
-      `Failed to create layer zip: ${zipProc.stderr.toString().trim()}`,
-    );
+    console.error(`Failed to create layer zip: ${zipProc.stderr.toString().trim()}`);
     process.exit(1);
   }
 

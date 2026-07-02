@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+
 import * as fc from "fast-check";
 
 describe("test infrastructure", () => {

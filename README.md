@@ -1,8 +1,9 @@
 # Lambda bun runtime
 
-[![View on Construct Hub](https://constructs.dev/badge?package=%40beesolve%2Flambda-bun-runtime)](https://constructs.dev/packages/@beesolve/lambda-bun-runtime)
-
 A custom [Bun](https://bun.sh) runtime for AWS Lambda with CDK constructs for easy deployment.
+
+> [!NOTE]
+> **v3 is ESM-only and no longer published as a jsii package.** Polyglot CDK support (Python, Java, .NET) has been removed — there were zero consumers. If you need the layer without CDK, the zip is available as a GitHub Release asset. See [ADR: Drop jsii](docs/adr-drop-jsii.md) for the full rationale.
 
 Current bun version: [1.3.14](https://bun.sh/blog/bun-v1.3.14)
 
@@ -17,7 +18,7 @@ npm i @beesolve/lambda-bun-runtime
 Two constructs are provided: `BunLambdaLayer` (the runtime layer) and `BunFunction` (a Lambda function that uses it).
 
 ```ts
-import { BunLambdaLayer, BunFunction } from '@beesolve/lambda-bun-runtime';
+import { BunLambdaLayer, BunFunction } from "@beesolve/lambda-bun-runtime";
 import { Duration } from "aws-cdk-lib";
 
 const bunLayer = new BunLambdaLayer(this, "BunLayer");
@@ -27,7 +28,7 @@ const apiHandler = new BunFunction(this, "ApiHandler", {
   memorySize: 1024,
   timeout: Duration.seconds(10),
   environment: {
-    STAGE: 'prod',
+    STAGE: "prod",
   },
   bunLayer,
 });
@@ -168,7 +169,7 @@ npm i @beesolve/lambda-fetch-api
 The recommended pattern exports both a `fetch` function (for local development with `bun run --serve`) and a `handler` function (for Lambda) from the same file:
 
 ```ts
-import { asHttpV2Handler } from '@beesolve/lambda-fetch-api';
+import { asHttpV2Handler } from "@beesolve/lambda-fetch-api";
 
 const fetch = async (request: Request): Promise<Response> => {
   return new Response("Hello from Bun!");
@@ -184,7 +185,7 @@ This dual-export pattern lets you run the same file locally and deploy it to Lam
 ### REST API (v1)
 
 ```ts
-import { asHttpV1Handler } from '@beesolve/lambda-fetch-api';
+import { asHttpV1Handler } from "@beesolve/lambda-fetch-api";
 
 const fetch = async (request: Request): Promise<Response> => {
   const url = new URL(request.url);
@@ -198,7 +199,7 @@ export default { fetch };
 ### Response streaming
 
 ```ts
-import { asResponseStreamHandler } from '@beesolve/lambda-fetch-api';
+import { asResponseStreamHandler } from "@beesolve/lambda-fetch-api";
 
 export const handler = asResponseStreamHandler(async () => {
   const stream = new ReadableStream({
@@ -217,11 +218,11 @@ export const handler = asResponseStreamHandler(async () => {
 The original event and context are stored per-invocation via `AsyncLocalStorage`. Call the getters from anywhere inside your handler — no need to thread parameters:
 
 ```ts
-import { asHttpV2Handler, getAwsV2Event, getAwsContext } from '@beesolve/lambda-fetch-api';
+import { asHttpV2Handler, getAwsV2Event, getAwsContext } from "@beesolve/lambda-fetch-api";
 
 export const handler = asHttpV2Handler(async (request) => {
-  const event = getAwsV2Event();    // APIGatewayProxyEventV2
-  const context = getAwsContext();   // Context
+  const event = getAwsV2Event(); // APIGatewayProxyEventV2
+  const context = getAwsContext(); // Context
 
   console.log(event.requestContext.requestId);
   console.log(context.getRemainingTimeInMillis());
@@ -230,12 +231,12 @@ export const handler = asHttpV2Handler(async (request) => {
 });
 ```
 
-| Getter | Returns |
-|---|---|
-| `getAwsEvent()` | `APIGatewayProxyEvent \| APIGatewayProxyEventV2` — auto-detected |
-| `getAwsV1Event()` | `APIGatewayProxyEvent` — throws if event is v2 |
-| `getAwsV2Event()` | `APIGatewayProxyEventV2` — throws if event is v1 |
-| `getAwsContext()` | `Context` |
+| Getter            | Returns                                                          |
+| ----------------- | ---------------------------------------------------------------- |
+| `getAwsEvent()`   | `APIGatewayProxyEvent \| APIGatewayProxyEventV2` — auto-detected |
+| `getAwsV1Event()` | `APIGatewayProxyEvent` — throws if event is v2                   |
+| `getAwsV2Event()` | `APIGatewayProxyEventV2` — throws if event is v1                 |
+| `getAwsContext()` | `Context`                                                        |
 
 All getters throw `NotInHandlerContextError` if called outside a handler invocation.
 
@@ -244,8 +245,11 @@ All getters throw `NotInHandlerContextError` if called outside a handler invocat
 For routes protected by a Lambda authorizer, use the narrowed handler variants:
 
 ```ts
-import { asLambdaAuthorizedHttpV2Handler, getAwsLambdaAuthorizerContext } from '@beesolve/lambda-fetch-api';
-import * as v from 'valibot';
+import {
+  asLambdaAuthorizedHttpV2Handler,
+  getAwsLambdaAuthorizerContext,
+} from "@beesolve/lambda-fetch-api";
+import * as v from "valibot";
 
 const AuthSchema = v.object({ userId: v.string(), role: v.string() });
 
@@ -260,14 +264,14 @@ The v1 equivalent is `asCustomAuthorizedHttpV1Handler` / `getAwsCustomAuthorizer
 ### Type guards
 
 ```ts
-import { getAwsEvent, isAPIGatewayProxyEventV2 } from '@beesolve/lambda-fetch-api';
+import { getAwsEvent, isAPIGatewayProxyEventV2 } from "@beesolve/lambda-fetch-api";
 
 const event = getAwsEvent();
 
 if (isAPIGatewayProxyEventV2(event)) {
-  console.log(event.rawPath);  // APIGatewayProxyEventV2
+  console.log(event.rawPath); // APIGatewayProxyEventV2
 } else {
-  console.log(event.path);     // APIGatewayProxyEvent
+  console.log(event.path); // APIGatewayProxyEvent
 }
 ```
 
@@ -290,6 +294,7 @@ The previous runtime converted Lambda events into Fetch API `Request` objects an
 Replace your Fetch-style handler with a standard Lambda handler:
 
 **Before (Fetch API style):**
+
 ```ts
 export default {
   fetch: async (request: Request): Promise<Response> => {
@@ -300,6 +305,7 @@ export default {
 ```
 
 **After (raw event style):**
+
 ```ts
 import type { APIGatewayProxyEventV2 } from "aws-lambda";
 
@@ -320,6 +326,7 @@ npm i @beesolve/lambda-fetch-api
 ```
 
 **Before (worked with old runtime directly):**
+
 ```ts
 export default {
   fetch: async (request: Request): Promise<Response> => {
@@ -329,8 +336,9 @@ export default {
 ```
 
 **After (works with new runtime via adapter):**
+
 ```ts
-import { asHttpV2Handler } from '@beesolve/lambda-fetch-api';
+import { asHttpV2Handler } from "@beesolve/lambda-fetch-api";
 
 const fetch = async (request: Request): Promise<Response> => {
   return new Response("Hello!");
@@ -346,14 +354,14 @@ Use `asHttpV1Handler` instead if your API is backed by API Gateway v1 (REST API)
 
 ### Summary of changes
 
-| Aspect | Old runtime | New runtime |
-|--------|-------------|-------------|
-| Handler signature | `fetch(request: Request): Response` | `handler(event, context): any` |
-| Event format | Converted to Fetch `Request` | Raw Lambda event (e.g., `APIGatewayProxyEventV2`) |
-| Response format | Fetch `Response` | Lambda response object (e.g., `{ statusCode, body }`) |
-| Fetch API support | Built-in | Via `@beesolve/lambda-fetch-api` adapter |
-| WebSocket support | Built-in (via Bun.serve) | Not applicable (use API Gateway WebSocket APIs) |
-| Local development | `bun run --serve` with same file | Same file works with dual-export pattern |
+| Aspect            | Old runtime                         | New runtime                                           |
+| ----------------- | ----------------------------------- | ----------------------------------------------------- |
+| Handler signature | `fetch(request: Request): Response` | `handler(event, context): any`                        |
+| Event format      | Converted to Fetch `Request`        | Raw Lambda event (e.g., `APIGatewayProxyEventV2`)     |
+| Response format   | Fetch `Response`                    | Lambda response object (e.g., `{ statusCode, body }`) |
+| Fetch API support | Built-in                            | Via `@beesolve/lambda-fetch-api` adapter              |
+| WebSocket support | Built-in (via Bun.serve)            | Not applicable (use API Gateway WebSocket APIs)       |
+| Local development | `bun run --serve` with same file    | Same file works with dual-export pattern              |
 
 ## Why Raw Events?
 
@@ -365,6 +373,7 @@ The previous approach (converting Lambda events to Fetch API objects) introduced
 4. **Debugging friction** — when something goes wrong, you're debugging two layers: the event-to-Request conversion and your actual logic
 
 The raw event approach means:
+
 - Zero overhead — events pass through untouched
 - Works with any Lambda trigger (HTTP, SQS, S3, EventBridge, DynamoDB Streams, etc.)
 - Standard Lambda patterns — all AWS documentation and examples apply directly

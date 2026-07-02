@@ -12,6 +12,10 @@ export const handler = async (event: APIGatewayProxyEventV2): Promise<APIGateway
     statusCode: 200,
     headers: { "Content-Type": "application/json" },
     cookies: ["it_cookie=server-set; Path=/; HttpOnly"],
-    body: JSON.stringify({ ok: true, eventVersion: "v2-plain", requestCookie: cookies["it_cookie"] }),
+    body: JSON.stringify({
+      ok: true,
+      eventVersion: "v2-plain",
+      requestCookie: cookies["it_cookie"],
+    }),
   };
 };

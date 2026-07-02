@@ -1,6 +1,7 @@
-import { mkdirSync, writeFileSync, rmSync } from "node:fs";
-import { spawn } from "bun";
 import { describe, expect, test } from "bun:test";
+import { mkdirSync, writeFileSync, rmSync } from "node:fs";
+
+import { spawn } from "bun";
 import * as fc from "fast-check";
 
 // Spawns the runtime with a mock Lambda Runtime API and returns observed behavior
@@ -15,7 +16,7 @@ function createMockServer(props: {
   const state = { invocationCount: 0 };
   const server = Bun.serve({
     port: props.port,
-    fetch(req) {
+    async fetch(req) {
       const url = new URL(req.url);
 
       if (url.pathname === "/2018-06-01/runtime/invocation/next") {
@@ -26,32 +27,28 @@ function createMockServer(props: {
         return new Response(JSON.stringify(props.event ?? { test: true }), {
           headers: {
             "Lambda-Runtime-Aws-Request-Id": `req-${state.invocationCount}`,
-            "Lambda-Runtime-Invoked-Function-Arn":
-              "arn:aws:lambda:us-east-1:123:function:test",
+            "Lambda-Runtime-Invoked-Function-Arn": "arn:aws:lambda:us-east-1:123:function:test",
             "Lambda-Runtime-Deadline-Ms": String(Date.now() + 30000),
           },
         });
       }
 
       if (url.pathname === "/2018-06-01/runtime/init/error") {
-        return req.json().then((body) => {
-          props.onInitError?.(body);
-          return new Response("OK");
-        });
+        const body = await req.json();
+        props.onInitError?.(body);
+        return new Response("OK");
       }
 
       if (url.pathname.endsWith("/response")) {
-        return req.text().then((body) => {
-          props.onResponse?.(body);
-          return new Response("OK");
-        });
+        const body = await req.text();
+        props.onResponse?.(body);
+        return new Response("OK");
       }
 
       if (url.pathname.endsWith("/error")) {
-        return req.json().then((body) => {
-          props.onInvocationError?.(body);
-          return new Response("OK");
-        });
+        const body = await req.json();
+        props.onInvocationError?.(body);
+        return new Response("OK");
       }
 
       return new Response("Not Found", { status: 404 });
@@ -60,10 +57,7 @@ function createMockServer(props: {
   return server;
 }
 
-async function waitFor(props: {
-  condition: () => boolean;
-  timeoutMs: number;
-}): Promise<void> {
+async function waitFor(props: { condition: () => boolean; timeoutMs: number }): Promise<void> {
   const deadline = Date.now() + props.timeoutMs;
   while (!props.condition() && Date.now() < deadline) {
     await new Promise((r) => setTimeout(r, 20));
@@ -78,12 +72,8 @@ describe("handler string resolution (Property 1)", () => {
 
     const samples = fc.sample(
       fc.tuple(
-        fc
-          .string({ minLength: 1, maxLength: 10 })
-          .filter((s) => /^[a-zA-Z][a-zA-Z0-9]*$/.test(s)),
-        fc
-          .string({ minLength: 1, maxLength: 10 })
-          .filter((s) => /^[a-zA-Z][a-zA-Z0-9]*$/.test(s)),
+        fc.string({ minLength: 1, maxLength: 10 }).filter((s) => /^[a-zA-Z][a-zA-Z0-9]*$/.test(s)),
+        fc.string({ minLength: 1, maxLength: 10 }).filter((s) => /^[a-zA-Z][a-zA-Z0-9]*$/.test(s)),
       ),
       10,
     );
@@ -174,7 +164,7 @@ describe("context object construction (Property 3)", () => {
       let response: string | null = null;
       const server = Bun.serve({
         port,
-        fetch(req) {
+        async fetch(req) {
           const url = new URL(req.url);
           if (url.pathname === "/2018-06-01/runtime/invocation/next") {
             return new Response(JSON.stringify({}), {
@@ -186,10 +176,8 @@ describe("context object construction (Property 3)", () => {
             });
           }
           if (url.pathname.endsWith("/response")) {
-            return req.text().then((body) => {
-              response = body;
-              return new Response("OK");
-            });
+            response = await req.text();
+            return new Response("OK");
           }
           return new Response("OK");
         },
@@ -270,7 +258,7 @@ describe("error formatting (Property 4)", () => {
     const err = errorBody as {
       errorType: string;
       errorMessage: string;
-      stackTrace?: string[];
+      stackTrace?: Array<string>;
     };
     expect(err.errorType).toBe("CustomError");
     expect(err.errorMessage).toBe("test message");
@@ -436,9 +424,7 @@ describe("runtime edge cases (Task 1.5)", () => {
     server.stop();
 
     expect(initError).not.toBeNull();
-    expect((initError as { errorMessage: string }).errorMessage).toContain(
-      "not a function",
-    );
+    expect((initError as { errorMessage: string }).errorMessage).toContain("not a function");
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
@@ -446,10 +432,7 @@ describe("runtime edge cases (Task 1.5)", () => {
     const port = 19244;
     const tmpDir = "/tmp/test-undef-response";
     mkdirSync(tmpDir, { recursive: true });
-    writeFileSync(
-      `${tmpDir}/undef.js`,
-      "export const handler = async () => undefined;",
-    );
+    writeFileSync(`${tmpDir}/undef.js`, "export const handler = async () => undefined;");
 
     let response: string | null = null;
     const server = createMockServer({
@@ -504,7 +487,7 @@ describe("streaming response", () => {
 
     const server = Bun.serve({
       port,
-      fetch(req) {
+      async fetch(req) {
         const url = new URL(req.url);
         if (url.pathname === "/2018-06-01/runtime/invocation/next") {
           return new Response(JSON.stringify({}), {
@@ -516,13 +499,9 @@ describe("streaming response", () => {
           });
         }
         if (url.pathname.endsWith("/response")) {
-          streamingHeader = req.headers.get(
-            "Lambda-Runtime-Function-Response-Mode",
-          );
-          return req.text().then((body) => {
-            responseBody = body;
-            return new Response("OK");
-          });
+          streamingHeader = req.headers.get("Lambda-Runtime-Function-Response-Mode");
+          responseBody = await req.text();
+          return new Response("OK");
         }
         return new Response("OK");
       },
@@ -568,7 +547,7 @@ describe("streaming response", () => {
 
     const server = Bun.serve({
       port,
-      fetch(req) {
+      async fetch(req) {
         const url = new URL(req.url);
         if (url.pathname === "/2018-06-01/runtime/invocation/next") {
           return new Response(JSON.stringify({}), {
@@ -580,13 +559,9 @@ describe("streaming response", () => {
           });
         }
         if (url.pathname.endsWith("/response")) {
-          streamingHeader = req.headers.get(
-            "Lambda-Runtime-Function-Response-Mode",
-          );
-          return req.text().then((body) => {
-            responseBody = body;
-            return new Response("OK");
-          });
+          streamingHeader = req.headers.get("Lambda-Runtime-Function-Response-Mode");
+          responseBody = await req.text();
+          return new Response("OK");
         }
         return new Response("OK");
       },
@@ -619,10 +594,7 @@ describe("event passthrough (Property 2)", () => {
   test("preserves arbitrary JSON data through handler", async () => {
     const tmpDir = "/tmp/test-passthrough";
     mkdirSync(tmpDir, { recursive: true });
-    writeFileSync(
-      `${tmpDir}/echo.js`,
-      "export const handler = async (event) => event;",
-    );
+    writeFileSync(`${tmpDir}/echo.js`, "export const handler = async (event) => event;");
 
     const samples = fc.sample(fc.jsonValue(), 5);
 
@@ -633,7 +605,7 @@ describe("event passthrough (Property 2)", () => {
 
       const server = Bun.serve({
         port,
-        fetch(req) {
+        async fetch(req) {
           const url = new URL(req.url);
           if (url.pathname === "/2018-06-01/runtime/invocation/next") {
             invocationCount++;
@@ -647,10 +619,8 @@ describe("event passthrough (Property 2)", () => {
             });
           }
           if (url.pathname.endsWith("/response")) {
-            return req.text().then((body) => {
-              response = body;
-              return new Response("OK");
-            });
+            response = await req.text();
+            return new Response("OK");
           }
           return new Response("OK");
         },

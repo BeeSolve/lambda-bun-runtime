@@ -19,11 +19,11 @@ type Handler = (
 interface LambdaError {
   errorType: string;
   errorMessage: string;
-  stackTrace?: string[];
+  stackTrace?: Array<string>;
 }
 
-const RUNTIME_API = process.env.AWS_LAMBDA_RUNTIME_API;
-const BASE_URL = `http://${RUNTIME_API}/2018-06-01`;
+const runtimeApi = process.env.AWS_LAMBDA_RUNTIME_API;
+const baseUrl = `http://${runtimeApi}/2018-06-01`;
 
 const handlerEnv = process.env._HANDLER;
 if (handlerEnv == null || !handlerEnv.includes(".")) {
@@ -32,11 +32,12 @@ if (handlerEnv == null || !handlerEnv.includes(".")) {
       `Invalid handler format: "${handlerEnv ?? ""}". Expected "filename.exportName".`,
     ),
   });
+  process.exit(1);
 }
 
-const lastDot = handlerEnv!.lastIndexOf(".");
-const filename = handlerEnv!.substring(0, lastDot);
-const exportName = handlerEnv!.substring(lastDot + 1);
+const lastDot = handlerEnv.lastIndexOf(".");
+const filename = handlerEnv.substring(0, lastDot);
+const exportName = handlerEnv.substring(lastDot + 1);
 const taskRoot = process.env.LAMBDA_TASK_ROOT ?? "/var/task";
 const modulePath = `${taskRoot}/${filename}`;
 
@@ -49,14 +50,11 @@ const logGroupName = process.env.AWS_LAMBDA_LOG_GROUP_NAME ?? "";
 const logStreamName = process.env.AWS_LAMBDA_LOG_STREAM_NAME ?? "";
 
 while (true) {
-  const res = await fetch(`${BASE_URL}/runtime/invocation/next`);
+  const res = await fetch(`${baseUrl}/runtime/invocation/next`);
 
   const requestId = res.headers.get("Lambda-Runtime-Aws-Request-Id") ?? "";
-  const invokedFunctionArn =
-    res.headers.get("Lambda-Runtime-Invoked-Function-Arn") ?? "";
-  const deadlineMs = Number(
-    res.headers.get("Lambda-Runtime-Deadline-Ms") ?? "0",
-  );
+  const invokedFunctionArn = res.headers.get("Lambda-Runtime-Invoked-Function-Arn") ?? "";
+  const deadlineMs = Number(res.headers.get("Lambda-Runtime-Deadline-Ms") ?? "0");
 
   const event: unknown = await res.json();
 
@@ -74,7 +72,7 @@ while (true) {
   try {
     const result = await handler(event, context);
     if (isStream(result)) {
-      await fetch(`${BASE_URL}/runtime/invocation/${requestId}/response`, {
+      await fetch(`${baseUrl}/runtime/invocation/${requestId}/response`, {
         method: "POST",
         headers: {
           "Lambda-Runtime-Function-Response-Mode": "streaming",
@@ -84,7 +82,7 @@ while (true) {
       });
     } else {
       const body = result === undefined ? "null" : JSON.stringify(result);
-      await fetch(`${BASE_URL}/runtime/invocation/${requestId}/response`, {
+      await fetch(`${baseUrl}/runtime/invocation/${requestId}/response`, {
         method: "POST",
         body,
       });
@@ -97,10 +95,7 @@ while (true) {
   }
 }
 
-async function resolveHandler(props: {
-  modulePath: string;
-  exportName: string;
-}): Promise<Handler> {
+async function resolveHandler(props: { modulePath: string; exportName: string }): Promise<Handler> {
   try {
     const mod = await import(props.modulePath);
     const fn = mod[props.exportName] ?? mod.default?.[props.exportName];
@@ -124,24 +119,19 @@ function formatError(props: { error: unknown }): LambdaError {
     return {
       errorType: props.error.name || "Error",
       errorMessage: props.error.message,
-      ...(props.error.stack != null
-        ? { stackTrace: props.error.stack.split("\n") }
-        : {}),
+      ...(props.error.stack != null ? { stackTrace: props.error.stack.split("\n") } : {}),
     };
   }
   return {
     errorType: "Error",
-    errorMessage:
-      typeof props.error === "string" ? props.error : Bun.inspect(props.error),
+    errorMessage: typeof props.error === "string" ? props.error : Bun.inspect(props.error),
   };
 }
 
 function isStream(value: unknown): value is StreamResponse {
   return (
     value instanceof ReadableStream ||
-    (value != null &&
-      typeof value === "object" &&
-      Symbol.asyncIterator in value)
+    (value != null && typeof value === "object" && Symbol.asyncIterator in value)
   );
 }
 
@@ -154,9 +144,7 @@ function toReadableStream(value: StreamResponse): ReadableStream<Uint8Array> {
     async start(controller) {
       try {
         for await (const chunk of value) {
-          controller.enqueue(
-            typeof chunk === "string" ? encoder.encode(chunk) : chunk,
-          );
+          controller.enqueue(typeof chunk === "string" ? encoder.encode(chunk) : chunk);
         }
         controller.close();
       } catch (err) {
@@ -166,11 +154,8 @@ function toReadableStream(value: StreamResponse): ReadableStream<Uint8Array> {
   });
 }
 
-async function postError(props: {
-  path: string;
-  error: unknown;
-}): Promise<void> {
-  await fetch(`${BASE_URL}/${props.path}`, {
+async function postError(props: { path: string; error: unknown }): Promise<void> {
+  await fetch(`${baseUrl}/${props.path}`, {
     method: "POST",
     headers: { "Content-Type": "application/vnd.aws.lambda.error+json" },
     body: JSON.stringify(formatError({ error: props.error })),

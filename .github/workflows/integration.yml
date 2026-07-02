@@ -24,17 +24,16 @@ jobs:
       contents: read
     env:
       AWS_REGION: eu-central-1
-      CI: "true"
     steps:
       - uses: actions/checkout@v6
 
       - uses: actions/setup-node@v6
         with:
-          node-version: lts/*
+          node-version: "24"
 
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version-file: .bun-version
 
       - uses: aws-actions/configure-aws-credentials@v5
         with:
@@ -43,9 +42,7 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
-      - run: bun run build-layer
-
-      - run: bun run compile
+      - run: bun run build
 
       - run: bun run integ:deploy-test-destroy
 
