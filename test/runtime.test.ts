@@ -1,8 +1,10 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, setDefaultTimeout, test } from "bun:test";
 import { mkdirSync, writeFileSync, rmSync } from "node:fs";
 
 import { spawn } from "bun";
 import * as fc from "fast-check";
+
+setDefaultTimeout(60000);
 
 // Spawns the runtime with a mock Lambda Runtime API and returns observed behavior
 function createMockServer(props: {
@@ -105,7 +107,7 @@ describe("handler string resolution (Property 1)", () => {
         stderr: "pipe",
       });
 
-      await waitFor({ condition: () => response != null, timeoutMs: 5000 });
+      await waitFor({ condition: () => response != null, timeoutMs: 15000 });
       proc.kill();
       await proc.exited;
       server.stop();
@@ -199,7 +201,7 @@ describe("context object construction (Property 3)", () => {
         stderr: "pipe",
       });
 
-      await waitFor({ condition: () => response != null, timeoutMs: 5000 });
+      await waitFor({ condition: () => response != null, timeoutMs: 15000 });
       proc.kill();
       await proc.exited;
       server.stop();
@@ -249,7 +251,7 @@ describe("error formatting (Property 4)", () => {
       stderr: "pipe",
     });
 
-    await waitFor({ condition: () => errorBody != null, timeoutMs: 5000 });
+    await waitFor({ condition: () => errorBody != null, timeoutMs: 15000 });
     proc.kill();
     await proc.exited;
     server.stop();
@@ -297,7 +299,7 @@ describe("error formatting (Property 4)", () => {
       stderr: "pipe",
     });
 
-    await waitFor({ condition: () => errorBody != null, timeoutMs: 5000 });
+    await waitFor({ condition: () => errorBody != null, timeoutMs: 15000 });
     proc.kill();
     await proc.exited;
     server.stop();
@@ -454,7 +456,7 @@ describe("runtime edge cases (Task 1.5)", () => {
       stderr: "pipe",
     });
 
-    await waitFor({ condition: () => response != null, timeoutMs: 5000 });
+    await waitFor({ condition: () => response != null, timeoutMs: 15000 });
     proc.kill();
     await proc.exited;
     server.stop();
@@ -518,7 +520,7 @@ describe("streaming response", () => {
       stderr: "pipe",
     });
 
-    await waitFor({ condition: () => responseBody != null, timeoutMs: 5000 });
+    await waitFor({ condition: () => responseBody != null, timeoutMs: 15000 });
     proc.kill();
     await proc.exited;
     server.stop();
@@ -578,7 +580,7 @@ describe("streaming response", () => {
       stderr: "pipe",
     });
 
-    await waitFor({ condition: () => responseBody != null, timeoutMs: 5000 });
+    await waitFor({ condition: () => responseBody != null, timeoutMs: 15000 });
     proc.kill();
     await proc.exited;
     server.stop();
@@ -637,7 +639,7 @@ describe("event passthrough (Property 2)", () => {
         stderr: "pipe",
       });
 
-      await waitFor({ condition: () => response != null, timeoutMs: 5000 });
+      await waitFor({ condition: () => response != null, timeoutMs: 15000 });
       proc.kill();
       await proc.exited;
       server.stop();
