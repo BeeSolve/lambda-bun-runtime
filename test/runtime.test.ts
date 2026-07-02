@@ -111,7 +111,7 @@ describe("handler string resolution (Property 1)", () => {
       server.stop();
 
       expect(response).not.toBeNull();
-      const parsed = JSON.parse(response!);
+      const parsed = JSON.parse(response as string);
       expect(parsed.resolved).toBe(`${filename}.${exportName}`);
     }
 
@@ -205,7 +205,7 @@ describe("context object construction (Property 3)", () => {
       server.stop();
 
       expect(response).not.toBeNull();
-      const ctx = JSON.parse(response!);
+      const ctx = JSON.parse(response as string);
       expect(ctx.functionName).toBe(env.functionName);
       expect(ctx.functionVersion).toBe(env.functionVersion);
       expect(ctx.memoryLimitInMB).toBe(env.memoryLimitInMB);

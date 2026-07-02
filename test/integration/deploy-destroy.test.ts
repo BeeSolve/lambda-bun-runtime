@@ -50,13 +50,14 @@ async function invokeLambda(arn: string, payload: unknown): Promise<unknown> {
       Payload: Buffer.from(JSON.stringify(payload)),
     }),
   );
-  return JSON.parse(Buffer.from(res.Payload!).toString());
+  return JSON.parse(Buffer.from(res.Payload ?? new Uint8Array()).toString());
 }
 
 async function getS3Object(bucket: string, key: string): Promise<string> {
   const client = new S3Client({ region: region });
   const res = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
-  return res.Body!.transformToString();
+  if (res.Body == null) throw new Error("S3 GetObject returned no body");
+  return res.Body.transformToString();
 }
 
 function assertSetCookieHeader(headers: Headers) {
@@ -141,7 +142,9 @@ describeInteg(
       );
       const decoder = new TextDecoder();
       let body = "";
-      for await (const chunk of res.EventStream!) {
+      if (res.EventStream == null)
+        throw new Error("InvokeWithResponseStream returned no EventStream");
+      for await (const chunk of res.EventStream) {
         if (chunk.PayloadChunk?.Payload) {
           body += decoder.decode(chunk.PayloadChunk.Payload);
         }
