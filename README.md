@@ -5,7 +5,7 @@ A custom [Bun](https://bun.sh) runtime for AWS Lambda with CDK constructs for ea
 > [!NOTE]
 > **v3 is ESM-only and no longer published as a jsii package.** Polyglot CDK support (Python, Java, .NET) has been removed — there were zero consumers. If you need the layer without CDK, the zip is available as a GitHub Release asset. See [ADR: Drop jsii](docs/adr-drop-jsii.md) for the full rationale.
 
-Current bun version: [1.3.14](https://bun.sh/blog/bun-v1.3.14)
+Current bun version: [1.4.0](https://bun.sh/blog/bun-v1.4.0)
 
 ## Installation
 
