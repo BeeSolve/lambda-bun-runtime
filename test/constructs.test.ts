@@ -1,5 +1,5 @@
 import { describe, expect, test, beforeAll, afterAll } from "bun:test";
-import { existsSync, writeFileSync, unlinkSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { App, Stack } from "aws-cdk-lib";
@@ -8,8 +8,11 @@ import * as fc from "fast-check";
 
 import { BunFunction, BunLambdaLayer } from "../src/index";
 
+const srcIndex = readFileSync(resolve(__dirname, "../src/index.ts"), "utf8");
+const bunVersion = srcIndex.match(/const bunVersion = "([^"]+)"/)?.[1] ?? "";
+
 // CDK's Code.fromAsset requires the zip to exist on disk during synth
-const dummyZipPath = resolve(__dirname, "../src/bun-lambda-layer-1.3.14.zip");
+const dummyZipPath = resolve(__dirname, `../src/bun-lambda-layer-${bunVersion}.zip`);
 
 beforeAll(() => {
   if (!existsSync(dummyZipPath)) {
