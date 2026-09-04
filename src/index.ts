@@ -7,7 +7,7 @@ import type { LayerVersionProps } from "aws-cdk-lib/aws-lambda";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import type { Construct } from "constructs";
 
-const bunVersion = "1.4.0";
+const bunVersion = "1.4.1";
 
 export interface BunFunctionProps extends Omit<
   FunctionProps,
