@@ -23,7 +23,9 @@
     "examples/sample-app"
   ],
   "files": [
-    "dist/"
+    "dist/",
+    "docs/how-to",
+    "DOCS.md"
   ],
   "type": "module",
   "main": "./dist/index.js",
