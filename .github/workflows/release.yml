@@ -7,6 +7,11 @@ on:
         description: "Bun version for the release (e.g. 1.3.14)"
         required: true
         type: string
+      patch:
+        description: "Internal patch number (Y in 3.X.Y) for releases that do not change the Bun version"
+        required: false
+        default: "0"
+        type: string
   push:
     branches: [main]
     paths: [".bun-version"]
@@ -39,8 +44,9 @@ jobs:
         run: |
           IFS='.' read -r MAJOR MINOR PATCH <<< "${{ steps.bun.outputs.version }}"
           PKG_MINOR=$((MAJOR * 10000 + MINOR * 100 + PATCH))
-          echo "version=3.${PKG_MINOR}.0" >> "$GITHUB_OUTPUT"
-          echo "Package version: 3.${PKG_MINOR}.0 (from Bun v${{ steps.bun.outputs.version }})"
+          PKG_PATCH="${{ inputs.patch || '0' }}"
+          echo "version=3.${PKG_MINOR}.${PKG_PATCH}" >> "$GITHUB_OUTPUT"
+          echo "Package version: 3.${PKG_MINOR}.${PKG_PATCH} (from Bun v${{ steps.bun.outputs.version }})"
 
       - name: Check if already released
         id: check
