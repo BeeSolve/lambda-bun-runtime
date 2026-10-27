@@ -66,6 +66,59 @@ async function waitFor(props: { condition: () => boolean; timeoutMs: number }): 
   }
 }
 
+// JS reserved words cannot be used as a `const`/`function` binding name, so a
+// generated handler like `export const in = ...` is a syntax error. Excluding
+// them keeps the generated identifiers valid (otherwise the test is flaky).
+const reservedWords = new Set([
+  "break",
+  "case",
+  "catch",
+  "class",
+  "const",
+  "continue",
+  "debugger",
+  "default",
+  "delete",
+  "do",
+  "else",
+  "enum",
+  "export",
+  "extends",
+  "false",
+  "finally",
+  "for",
+  "function",
+  "if",
+  "import",
+  "in",
+  "instanceof",
+  "new",
+  "null",
+  "return",
+  "super",
+  "switch",
+  "this",
+  "throw",
+  "true",
+  "try",
+  "typeof",
+  "var",
+  "void",
+  "while",
+  "with",
+  "yield",
+  "let",
+  "static",
+  "await",
+  "async",
+]);
+
+function validIdentifier(props: { minLength: number; maxLength: number }): fc.Arbitrary<string> {
+  return fc
+    .string({ minLength: props.minLength, maxLength: props.maxLength })
+    .filter((value) => /^[a-zA-Z][a-zA-Z0-9]*$/.test(value) && !reservedWords.has(value));
+}
+
 describe("handler string resolution (Property 1)", () => {
   test("resolves filename.exportName and calls the correct export", async () => {
     // Test through the runtime: create handlers with various names and verify they get called
@@ -74,8 +127,8 @@ describe("handler string resolution (Property 1)", () => {
 
     const samples = fc.sample(
       fc.tuple(
-        fc.string({ minLength: 1, maxLength: 10 }).filter((s) => /^[a-zA-Z][a-zA-Z0-9]*$/.test(s)),
-        fc.string({ minLength: 1, maxLength: 10 }).filter((s) => /^[a-zA-Z][a-zA-Z0-9]*$/.test(s)),
+        validIdentifier({ minLength: 1, maxLength: 10 }),
+        validIdentifier({ minLength: 1, maxLength: 10 }),
       ),
       10,
     );
