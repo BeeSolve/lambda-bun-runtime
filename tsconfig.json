@@ -4,6 +4,7 @@
     "target": "ES2023",
     "module": "Preserve",
     "moduleResolution": "Bundler",
+    "resolveJsonModule": true,
     "verbatimModuleSyntax": true,
     "declaration": true,
     "emitDeclarationOnly": true,
@@ -15,6 +16,6 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "src/artifacts.json"],
   "exclude": ["node_modules"]
 }

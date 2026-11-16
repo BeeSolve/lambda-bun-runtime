@@ -2,13 +2,16 @@
 
 > Full working example: https://github.com/BeeSolve/lambda-bun-runtime/tree/main/examples/sample-app
 
-This package provides two AWS CDK constructs: `BunLambdaLayer` (the prebuilt Bun
-runtime layer) and `BunFunction` (a `lambda.Function` that runs on it). Functions
-run on `PROVIDED_AL2023` / `arm64`.
+This package provides two AWS CDK constructs: `BunLambdaLayer` (the Bun runtime
+layer) and `BunFunction` (a `lambda.Function` that runs on it). Functions run on
+`PROVIDED_AL2023` / `arm64`. `BunLambdaLayer` references the layer BeeSolve publishes
+for this package version in the stack's region.
 
 ## Prerequisites
 
-- An AWS CDK app (`aws-cdk-lib` v2)
+- An AWS CDK app (`aws-cdk-lib` v2) with a stack that has a concrete region
+  (`env: { region: "eu-central-1" }`). Published layers exist in `eu-north-1`,
+  `eu-central-1`, `eu-west-1`, `us-east-1` and `us-west-2`
 - A handler file written for Bun (`.ts` or precompiled `.js`)
 
 ## Steps
@@ -60,6 +63,9 @@ file exports a differently-named function.
 
 - **The layer is required.** `BunFunction` needs `bunLayer` - create one
   `BunLambdaLayer` per stack and reuse it across functions.
+- **Region must be known and published.** An environment-agnostic stack or a region
+  without a published layer throws at synth. Use `layerVersionArn` or `assetZipPath`,
+  see [Other regions and your own layer](./custom-layer.md).
 - **Entrypoint extension matters.** A `.ts` entrypoint is built with Bun at synth
   time; a `.js` entrypoint is used as-is. The type only accepts `.ts` or `.js`.
 - **arm64 only.** The layer is published for `arm64` / `PROVIDED_AL2023`; do not
@@ -67,5 +73,6 @@ file exports a differently-named function.
 
 ## See Also
 
+- [Other regions and your own layer](./custom-layer.md)
 - [README](../../README.md) - handler signatures, Fetch API support, and response streaming
 - [Full example on GitHub](https://github.com/BeeSolve/lambda-bun-runtime/tree/main/examples/sample-app)

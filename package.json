@@ -19,6 +19,9 @@
     "type": "git",
     "url": "git+https://github.com/BeeSolve/lambda-bun-runtime"
   },
+  "bin": {
+    "bun-lambda-runtime": "./dist/cli.js"
+  },
   "workspaces": [
     "examples/sample-app"
   ],

@@ -1,11 +1,12 @@
-import { basename, dirname, join } from "node:path";
+import { basename, dirname } from "node:path";
 
-import { RemovalPolicy, Stack } from "aws-cdk-lib";
+import { RemovalPolicy, Resource, Stack, Token } from "aws-cdk-lib";
 import { Architecture, Code, Function, LayerVersion, Runtime } from "aws-cdk-lib/aws-lambda";
-import type { FunctionProps } from "aws-cdk-lib/aws-lambda";
-import type { LayerVersionProps } from "aws-cdk-lib/aws-lambda";
+import type { FunctionProps, ILayerVersion, LayerVersionPermission } from "aws-cdk-lib/aws-lambda";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import type { Construct } from "constructs";
+
+import { publishedArtifacts, resolveRegionArtifacts } from "./artifacts";
 
 const bunVersion = "1.4.5";
 
@@ -31,7 +32,7 @@ export interface BunFunctionProps extends Omit<
   /**
    * Bun layer needs to be set.
    */
-  readonly bunLayer: BunLambdaLayer;
+  readonly bunLayer: ILayerVersion;
 }
 
 export class BunFunction extends Function {
@@ -58,28 +59,81 @@ export class BunFunction extends Function {
   }
 }
 
-export type BunLambdaLayerProps = Omit<
-  LayerVersionProps,
-  | "description"
-  | "removalPolicy"
-  | "code"
-  | "compatibleArchitectures"
-  | "compatibleRuntimes"
-  | "layerVersionName"
->;
+export type BunLambdaLayerProps =
+  | {
+      /**
+       * Use an existing layer version instead of the published BeeSolve layer.
+       */
+      readonly layerVersionArn: string;
+      readonly assetZipPath?: never;
+    }
+  | {
+      /**
+       * Path to a layer zip built with the `build-layer` command. The zip is
+       * uploaded as a CDK asset and published as a layer in your account.
+       */
+      readonly assetZipPath: string;
+      readonly layerVersionArn?: never;
+    }
+  | {
+      readonly layerVersionArn?: never;
+      readonly assetZipPath?: never;
+    };
 
-export class BunLambdaLayer extends LayerVersion {
-  constructor(scope: Construct, id: string, props?: BunLambdaLayerProps) {
-    super(scope, id, {
-      ...props,
-      description: `Bun v${bunVersion} Lambda runtime layer.`,
-      removalPolicy: RemovalPolicy.DESTROY,
-      code: Code.fromAsset(join(import.meta.dirname, `bun-lambda-layer-${bunVersion}.zip`)),
-      compatibleArchitectures: [Architecture.ARM_64],
-      compatibleRuntimes: [Runtime.PROVIDED_AL2023],
-      layerVersionName: "BunRuntime",
-    });
+/**
+ * The Bun runtime layer. By default it references the layer BeeSolve publishes
+ * for this package version in the stack's region. Pass `layerVersionArn` or
+ * `assetZipPath` to use your own layer (needed for regions without a published layer).
+ */
+export class BunLambdaLayer extends Resource implements ILayerVersion {
+  public readonly layerVersionArn: string;
+  public readonly compatibleRuntimes: Array<Runtime> = [Runtime.PROVIDED_AL2023];
+
+  private readonly layer: ILayerVersion;
+
+  constructor(scope: Construct, id: string, props: BunLambdaLayerProps = {}) {
+    super(scope, id);
+
+    if (props.assetZipPath != null) {
+      this.layer = new LayerVersion(this, "Layer", {
+        description: `Bun v${bunVersion} Lambda runtime layer.`,
+        removalPolicy: RemovalPolicy.DESTROY,
+        code: Code.fromAsset(props.assetZipPath),
+        compatibleArchitectures: [Architecture.ARM_64],
+        compatibleRuntimes: [Runtime.PROVIDED_AL2023],
+        layerVersionName: "BunRuntime",
+      });
+    } else {
+      const arn =
+        props.layerVersionArn ??
+        resolveRegionArtifacts({
+          region: concreteRegion({ scope }),
+          artifacts: publishedArtifacts,
+        }).layerVersionArn;
+      this.layer = LayerVersion.fromLayerVersionArn(this, "Layer", arn);
+    }
+
+    this.layerVersionArn = this.layer.layerVersionArn;
   }
+
+  public get layerVersionRef(): ILayerVersion["layerVersionRef"] {
+    return { layerVersionArn: this.layerVersionArn };
+  }
+
+  public addPermission(id: string, permission: LayerVersionPermission): void {
+    this.layer.addPermission(id, permission);
+  }
+}
+
+function concreteRegion(props: { readonly scope: Construct }): string {
+  const region = Stack.of(props.scope).region;
+  if (Token.isUnresolved(region)) {
+    throw new Error(
+      "BunLambdaLayer needs a concrete region to find the published layer. " +
+        "Set env.region on the stack, or pass layerVersionArn or assetZipPath.",
+    );
+  }
+  return region;
 }
 
 function deriveBasename(props: { entrypoint: string }): string {

@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed (targets v4.0)
+Accepted (targets v4.0)
 
 ## Context
 
@@ -90,14 +90,21 @@ Lambda customer-managed runtimes (CMR) reached GA. Findings from testing them ag
 4. **Per-consumer CMR built at deploy time (CDK asset and custom resource).** Needs Docker at synth and a
    custom resource that AWS will replace with a native resource.
 
+## Resolved questions
+
+1. **Integration test ordering.** The release publishes to `eu-central-1` first, runs the integration
+   test against that published layer, and only then publishes the other regions and npm. Pull request
+   runs have no published layer and deploy a layer built from source (`BUN_LAYER_ZIP`).
+2. **Designated account.** The BeeSolve artifacts account, reached from GitHub Actions through an OIDC
+   role limited to this repository and the `main` branch. Setup is in `docs/aws-oidc-setup-publish.md`.
+3. **Runtime image base.** The image is `provided:al2023` with the Bun binary copied from the official
+   `oven/bun:<version>` image. The binary is byte-identical to the one in the GitHub release zip and in
+   the layer (verified with SHA-256 for 1.4.4). The release job checks the hashes match and fails otherwise.
+4. **API shape.** `new BunLambdaLayer(scope, id)` resolves the published layer. Props `layerVersionArn`
+   or `assetZipPath` (mutually exclusive) select your own layer. `BunFunction.bunLayer` accepts any
+   `ILayerVersion`. The shipped CLI `bun-lambda-runtime build-layer` builds the zip for `assetZipPath`.
+
 ## Open questions
 
-1. **Integration test ordering.** The test deploys a sample app that uses the layer. Options: publish to
-   one region first, run the test against it, then publish the remaining regions; or let the sample app
-   use the build-it-yourself layer path.
-2. **Designated account and role.** Which account hosts the artifacts, the OIDC role name and its
-   permissions (publish layer, add permission, ECR push, runtime create, put-resource-policy).
-3. **Runtime image base.** Keep `provided:al2023` plus the Bun binary copied from the official image, or
-   build from the same Bun zip as the layer so both artifacts are byte-identical in runtime content.
-4. **Explicit-ARN API shape** on `BunLambdaLayer` and the future CMR construct.
-5. **Regions.** Add more regions later by extending a single list. Opt-in regions need extra setup.
+1. Adding regions later is a one-line change to the region list, opt-in regions need extra account setup.
+2. CMR construct: wait for CloudFormation and CDK `runtimeConfig` support, or ship a custom resource.
