@@ -3,7 +3,7 @@
 A custom [Bun](https://bun.sh) runtime for AWS Lambda with CDK constructs for easy deployment.
 
 > [!NOTE]
-> **v3 is ESM-only and no longer published as a jsii package.** Polyglot CDK support (Python, Java, .NET) has been removed — there were zero consumers. If you need the layer without CDK, the zip is available as a GitHub Release asset. See [ADR: Drop jsii](docs/adr-drop-jsii.md) for the full rationale.
+> **v4 no longer ships the layer zip in the npm package.** `BunLambdaLayer` now references a Bun layer that BeeSolve publishes for each release in these regions: `eu-north-1`, `eu-central-1`, `eu-west-1`, `us-east-1`, `us-west-2`. For any other region, pass your own layer (see [Other regions and your own layer](docs/how-to/custom-layer.md)). v3 is the last version that works in every region without extra steps. v3 was ESM-only and no longer a jsii package, see [ADR: Drop jsii](docs/adr-drop-jsii.md). The reasoning for v4 is in [ADR: Public artifacts](docs/adr-public-artifacts.md).
 
 Current bun version: [1.4.5](https://bun.sh/blog/bun-v1.4.5)
 
@@ -32,6 +32,15 @@ const apiHandler = new BunFunction(this, "ApiHandler", {
   },
   bunLayer,
 });
+```
+
+The stack needs a concrete region (`env: { region: "eu-central-1" }`), because the published layer is looked up by region. Outside the published regions, or with an environment-agnostic stack, pass `layerVersionArn` or `assetZipPath`:
+
+```ts
+new BunLambdaLayer(this, "BunLayer", {
+  layerVersionArn: "arn:aws:lambda:eu-west-3:123456789012:layer:BunRuntime:1",
+});
+new BunLambdaLayer(this, "BunLayer", { assetZipPath: "lib/bun-lambda-layer-1.4.4.zip" });
 ```
 
 `BunFunction` accepts `.ts` and `.js` entrypoints. TypeScript files are built with Bun automatically during CDK synth. JavaScript files are used as-is.

@@ -13,7 +13,12 @@ export class SampleStack extends Stack {
   constructor(scope: Construct, id: string, props?: StackProps) {
     super(scope, id, props);
 
-    const bunLayer = new BunLambdaLayer(this, "BunLayer");
+    // Published layer by default. Set BUN_LAYER_ZIP to deploy a locally built layer zip
+    // (PR integration runs, where no layer is published yet).
+    const layerZip = process.env.BUN_LAYER_ZIP;
+    const bunLayer = new BunLambdaLayer(this, "BunLayer", {
+      ...(layerZip == null ? {} : { assetZipPath: layerZip }),
+    });
 
     // HTTP v2 — Function URL
     const httpV2Fn = new BunFunction(this, "HttpV2Fn", {

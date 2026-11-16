@@ -1,5 +1,6 @@
 import { describe, expect, test, beforeAll, afterAll } from "bun:test";
-import { existsSync, readFileSync, writeFileSync, unlinkSync } from "node:fs";
+import { existsSync, writeFileSync, unlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 
 import { App, Stack } from "aws-cdk-lib";
@@ -8,19 +9,15 @@ import * as fc from "fast-check";
 
 import { BunFunction, BunLambdaLayer } from "../src/index";
 
-const srcIndex = readFileSync(resolve(__dirname, "../src/index.ts"), "utf8");
-const bunVersion = srcIndex.match(/const bunVersion = "([^"]+)"/)?.[1] ?? "";
+const testLayerArn = "arn:aws:lambda:eu-central-1:123456789012:layer:BunRuntime:7";
 
 // CDK's Code.fromAsset requires the zip to exist on disk during synth
-const dummyZipPath = resolve(__dirname, `../src/bun-lambda-layer-${bunVersion}.zip`);
+const dummyZipPath = resolve(tmpdir(), `bun-lambda-layer-test-${process.pid}.zip`);
 
 beforeAll(() => {
-  if (!existsSync(dummyZipPath)) {
-    // Create a minimal valid zip (PK header + empty)
-    const proc = Bun.spawnSync(["zip", "-j", dummyZipPath, "/dev/null"]);
-    if (proc.exitCode !== 0) {
-      writeFileSync(dummyZipPath, Buffer.alloc(0));
-    }
+  const proc = Bun.spawnSync(["zip", "-j", dummyZipPath, "/dev/null"]);
+  if (proc.exitCode !== 0) {
+    writeFileSync(dummyZipPath, Buffer.alloc(0));
   }
 });
 
@@ -98,7 +95,7 @@ describe("CDK construct unit tests", () => {
   test("BunFunction with .js entrypoint produces correct handler string", () => {
     const app = new App();
     const stack = new Stack(app, "TestStack");
-    const bunLayer = new BunLambdaLayer(stack, "Layer");
+    const bunLayer = new BunLambdaLayer(stack, "Layer", { layerVersionArn: testLayerArn });
 
     new BunFunction(stack, "Fn", {
       entrypoint: `${__dirname}/fixtures/api.js`,
@@ -114,7 +111,7 @@ describe("CDK construct unit tests", () => {
   test("BunFunction with .ts entrypoint uses Code.fromCustomCommand", () => {
     const app = new App();
     const stack = new Stack(app, "TestStack");
-    const bunLayer = new BunLambdaLayer(stack, "Layer");
+    const bunLayer = new BunLambdaLayer(stack, "Layer", { layerVersionArn: testLayerArn });
 
     new BunFunction(stack, "Fn", {
       entrypoint: `${__dirname}/fixtures/handler.ts`,
@@ -130,7 +127,7 @@ describe("CDK construct unit tests", () => {
   test("BunFunction with explicit exportName uses provided value", () => {
     const app = new App();
     const stack = new Stack(app, "TestStack");
-    const bunLayer = new BunLambdaLayer(stack, "Layer");
+    const bunLayer = new BunLambdaLayer(stack, "Layer", { layerVersionArn: testLayerArn });
 
     new BunFunction(stack, "Fn", {
       entrypoint: `${__dirname}/fixtures/api.js`,
@@ -147,7 +144,7 @@ describe("CDK construct unit tests", () => {
   test("BunFunction does NOT use .fetch as default export", () => {
     const app = new App();
     const stack = new Stack(app, "TestStack");
-    const bunLayer = new BunLambdaLayer(stack, "Layer");
+    const bunLayer = new BunLambdaLayer(stack, "Layer", { layerVersionArn: testLayerArn });
 
     new BunFunction(stack, "Fn", {
       entrypoint: `${__dirname}/fixtures/api.js`,
@@ -162,11 +159,11 @@ describe("CDK construct unit tests", () => {
     }
   });
 
-  test("BunLambdaLayer creates layer with correct properties", () => {
+  test("BunLambdaLayer with assetZipPath creates a layer with correct properties", () => {
     const app = new App();
     const stack = new Stack(app, "TestStack");
 
-    new BunLambdaLayer(stack, "Layer");
+    new BunLambdaLayer(stack, "Layer", { assetZipPath: dummyZipPath });
 
     const template = Template.fromStack(stack);
     template.hasResourceProperties("AWS::Lambda::LayerVersion", {
@@ -176,10 +173,45 @@ describe("CDK construct unit tests", () => {
     });
   });
 
+  test("BunLambdaLayer with layerVersionArn creates no layer and attaches the ARN", () => {
+    const app = new App();
+    const stack = new Stack(app, "TestStack");
+    const bunLayer = new BunLambdaLayer(stack, "Layer", { layerVersionArn: testLayerArn });
+
+    new BunFunction(stack, "Fn", {
+      entrypoint: `${__dirname}/fixtures/api.js`,
+      bunLayer,
+    });
+
+    const template = Template.fromStack(stack);
+    template.resourceCountIs("AWS::Lambda::LayerVersion", 0);
+    template.hasResourceProperties("AWS::Lambda::Function", {
+      Layers: [testLayerArn],
+    });
+  });
+
+  test("BunLambdaLayer without props throws for a region with no published layer", () => {
+    const app = new App();
+    const stack = new Stack(app, "TestStack", {
+      env: { account: "123456789012", region: "eu-west-3" },
+    });
+
+    expect(() => new BunLambdaLayer(stack, "Layer")).toThrow(
+      /No published Bun layer for region "eu-west-3"/,
+    );
+  });
+
+  test("BunLambdaLayer without props throws for an environment-agnostic stack", () => {
+    const app = new App();
+    const stack = new Stack(app, "TestStack");
+
+    expect(() => new BunLambdaLayer(stack, "Layer")).toThrow(/needs a concrete region/);
+  });
+
   test("BunFunction uses PROVIDED_AL2023 runtime and ARM_64 architecture", () => {
     const app = new App();
     const stack = new Stack(app, "TestStack");
-    const bunLayer = new BunLambdaLayer(stack, "Layer");
+    const bunLayer = new BunLambdaLayer(stack, "Layer", { layerVersionArn: testLayerArn });
 
     new BunFunction(stack, "Fn", {
       entrypoint: `${__dirname}/fixtures/api.js`,

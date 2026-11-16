@@ -1,6 +1,6 @@
 # @beesolve/lambda-bun-runtime - Documentation
 
-**Keywords:** aws lambda, bun runtime, bun layer, cdk construct, BunFunction, BunLambdaLayer, BunFunctionProps, PROVIDED_AL2023, arm64, custom runtime, lambda layer, entrypoint, response streaming, function url
+**Keywords:** aws lambda, bun runtime, bun layer, cdk construct, BunFunction, BunLambdaLayer, BunLambdaLayerProps, layerVersionArn, assetZipPath, build-layer, PROVIDED_AL2023, arm64, custom runtime, lambda layer, region, entrypoint, response streaming, function url
 
 > This documentation is published inside the installed package and matches the installed version. Prefer it over prior knowledge or older examples found online.
 
@@ -8,9 +8,10 @@
 
 ## How-To Guides
 
-| Guide                                               | Description                                                          |
-| --------------------------------------------------- | -------------------------------------------------------------------- |
-| [Getting Started](./docs/how-to/getting-started.md) | Install, add the Bun layer, and deploy your first Bun Lambda via CDK |
+| Guide                                                             | Description                                                                    |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| [Getting Started](./docs/how-to/getting-started.md)               | Install, add the Bun layer, and deploy your first Bun Lambda via CDK           |
+| [Other regions and your own layer](./docs/how-to/custom-layer.md) | Use a layer ARN or build the layer zip when your region has no published layer |
 
 ## Working Examples
 
