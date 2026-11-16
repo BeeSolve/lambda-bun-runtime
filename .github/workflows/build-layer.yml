@@ -51,7 +51,7 @@ jobs:
         run: |
           IFS='.' read -r MAJOR MINOR PATCH <<< "${{ inputs.version }}"
           PKG_MINOR=$((MAJOR * 10000 + MINOR * 100 + PATCH))
-          echo "version=3.${PKG_MINOR}.0" >> "$GITHUB_OUTPUT"
+          echo "version=4.${PKG_MINOR}.0" >> "$GITHUB_OUTPUT"
 
       - name: Commit and create PR
         uses: peter-evans/create-pull-request@v8
@@ -70,8 +70,8 @@ jobs:
             - Updated `src/index.ts` version constant
             - Updated `README.md` version badge
 
-            The layer zip is built fresh during release — no binary committed.
-            Merging this PR will trigger the release workflow and publish `@beesolve/lambda-bun-runtime@${{ steps.pkg.outputs.version }}` to npm.
+            The layer zip is built fresh during release - no binary committed.
+            Merging this PR will trigger the release workflow: it publishes the public layer in all regions, runs the integration test against it and then publishes `@beesolve/lambda-bun-runtime@${{ steps.pkg.outputs.version }}` to npm.
           add-paths: |
             .bun-version
             src/index.ts

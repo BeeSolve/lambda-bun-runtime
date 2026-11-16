@@ -56,18 +56,19 @@ bun install
 
 ## Build Pipeline (`command/build.ts`)
 
-1. Runs `command/buildLayer.ts` → produces `lib/bun-lambda-layer-{version}.zip`
-2. Bundles `src/index.ts` with `Bun.build` → `dist/index.js` (ESM, externals: aws-cdk-lib, constructs)
-3. Runs `tsc --emitDeclarationOnly` → `dist/index.d.ts`
-4. Copies layer zip from `lib/` to `dist/`
+1. Bundles `src/index.ts` with `Bun.build` -> `dist/index.js` (ESM, externals: aws-cdk-lib, constructs). `src/artifacts.json` is bundled in.
+2. Runs `tsc --emitDeclarationOnly` -> `dist/index.d.ts`
+3. Bundles `command/cli.ts` -> `dist/cli.js` (the `bun-lambda-runtime` bin) and copies `command/runtime.mts` to `dist/runtime.mts`
 
-Published package contains only `dist/` (JS, declarations, layer zip).
+The layer zip is built separately with `bun run build:layer` -> `lib/bun-lambda-layer-{version}.zip`. It is published as a public layer by the release workflow and attached to the GitHub release, it is NOT in the npm package. `src/artifacts.json` is an empty placeholder in git; the release workflow writes the real ARNs into it before `bun run build`.
+
+Published package contains `dist/`, `docs/how-to` and `DOCS.md` only.
 
 ## Versioning
 
-`3.<bun_major * 10000 + bun_minor * 100 + bun_patch>.<internal_patch>`
+`4.<bun_major * 10000 + bun_minor * 100 + bun_patch>.<internal_patch>`
 
-- Major: `3` (post-projen era)
+- Major: `4` (layer published as a public artifact, zip no longer in the package)
 - Minor: encodes the full Bun version
 - Patch: internal changes (resets to 0 on Bun version bump)
 
@@ -78,6 +79,7 @@ Published package contains only `dist/` (JS, declarations, layer zip).
 - `test/` uses `bun:test` and `fast-check` for property-based tests.
 - `lib/` is gitignored — CI builds the layer fresh each time.
 - `dist/` is gitignored — CI builds and publishes from fresh output.
+- `mise.toml` sets `AWS_PROFILE` for this repo and mise shims override a profile exported in the shell. Check `aws sts get-caller-identity` before running anything in `command/` that calls AWS.
 
 ## Coding Style & Conventions
 

@@ -8,7 +8,7 @@ on:
         required: true
         type: string
       patch:
-        description: "Internal patch number (Y in 3.X.Y) for releases that do not change the Bun version"
+        description: "Internal patch number (Y in 4.X.Y) for releases that do not change the Bun version"
         required: false
         default: "0"
         type: string
@@ -17,16 +17,14 @@ on:
     paths: [".bun-version"]
 
 jobs:
-  integration_test:
-    uses: ./.github/workflows/integration.yml
-    secrets: inherit
-
-  release:
-    needs: integration_test
+  prepare:
     runs-on: ubuntu-24.04
     permissions:
-      contents: write
-      id-token: write
+      contents: read
+    outputs:
+      bun-version: ${{ steps.bun.outputs.version }}
+      package-version: ${{ steps.pkg.outputs.version }}
+      skip: ${{ steps.check.outputs.skip }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -45,8 +43,8 @@ jobs:
           IFS='.' read -r MAJOR MINOR PATCH <<< "${{ steps.bun.outputs.version }}"
           PKG_MINOR=$((MAJOR * 10000 + MINOR * 100 + PATCH))
           PKG_PATCH="${{ inputs.patch || '0' }}"
-          echo "version=3.${PKG_MINOR}.${PKG_PATCH}" >> "$GITHUB_OUTPUT"
-          echo "Package version: 3.${PKG_MINOR}.${PKG_PATCH} (from Bun v${{ steps.bun.outputs.version }})"
+          echo "version=4.${PKG_MINOR}.${PKG_PATCH}" >> "$GITHUB_OUTPUT"
+          echo "Package version: 4.${PKG_MINOR}.${PKG_PATCH} (from Bun v${{ steps.bun.outputs.version }})"
 
       - name: Check if already released
         id: check
@@ -59,53 +57,216 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
+  build-layer:
+    needs: prepare
+    if: needs.prepare.outputs.skip == 'false'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
       - uses: oven-sh/setup-bun@v2
-        if: steps.check.outputs.skip == 'false'
+        with:
+          bun-version-file: .bun-version
+
+      - run: bun install --frozen-lockfile
+
+      - name: Build layer zip
+        run: bun run build:layer
+        env:
+          BUN_VERSION: ${{ needs.prepare.outputs.bun-version }}
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: layer-zip
+          path: lib/bun-lambda-layer-*.zip
+          if-no-files-found: error
+
+  # The first region is published on its own so the integration test can run against
+  # the published layer before the remaining regions and npm are touched.
+  publish-first-region:
+    needs: [prepare, build-layer]
+    runs-on: ubuntu-24.04
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+
+      - run: bun install --frozen-lockfile
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: layer-zip
+          path: lib
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_PUBLISH_ROLE_ARN }}
+          aws-region: eu-central-1
+
+      - name: Publish layer in eu-central-1
+        run: |
+          mkdir -p results
+          bun command/publishLayer.ts \
+            --region eu-central-1 \
+            --zip lib/bun-lambda-layer-${{ needs.prepare.outputs.bun-version }}.zip \
+            --bun-version ${{ needs.prepare.outputs.bun-version }} \
+            --package-version ${{ needs.prepare.outputs.package-version }} \
+            --git-sha ${{ github.sha }} \
+            --out results/eu-central-1.json
+
+      - name: Write artifacts.json for the integration test
+        run: |
+          bun command/writeArtifacts.ts \
+            --package-version ${{ needs.prepare.outputs.package-version }} \
+            --bun-version ${{ needs.prepare.outputs.bun-version }} \
+            results/eu-central-1.json
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: artifacts-json-first-region
+          path: src/artifacts.json
+          if-no-files-found: error
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: layer-result-eu-central-1
+          path: results/eu-central-1.json
+          if-no-files-found: error
+
+  integration_test:
+    needs: [prepare, publish-first-region]
+    uses: ./.github/workflows/integration.yml
+    with:
+      published-layer: true
+    secrets: inherit
+
+  publish-other-regions:
+    needs: [prepare, integration_test]
+    runs-on: ubuntu-24.04
+    permissions:
+      id-token: write
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        region: [eu-north-1, eu-west-1, us-east-1, us-west-2]
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
+
+      - run: bun install --frozen-lockfile
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: layer-zip
+          path: lib
+
+      - uses: aws-actions/configure-aws-credentials@v6
+        with:
+          role-to-assume: ${{ secrets.AWS_PUBLISH_ROLE_ARN }}
+          aws-region: ${{ matrix.region }}
+
+      - name: Publish layer in ${{ matrix.region }}
+        run: |
+          mkdir -p results
+          bun command/publishLayer.ts \
+            --region ${{ matrix.region }} \
+            --zip lib/bun-lambda-layer-${{ needs.prepare.outputs.bun-version }}.zip \
+            --bun-version ${{ needs.prepare.outputs.bun-version }} \
+            --package-version ${{ needs.prepare.outputs.package-version }} \
+            --git-sha ${{ github.sha }} \
+            --out results/${{ matrix.region }}.json
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: layer-result-${{ matrix.region }}
+          path: results/${{ matrix.region }}.json
+          if-no-files-found: error
+
+  release:
+    needs: [prepare, build-layer, publish-other-regions]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
         with:
           bun-version-file: .bun-version
 
       - uses: actions/setup-node@v6
-        if: steps.check.outputs.skip == 'false'
         with:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
       - run: bun install --frozen-lockfile
-        if: steps.check.outputs.skip == 'false'
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: layer-zip
+          path: lib
+
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: layer-result-*
+          merge-multiple: true
+          path: results
+
+      - name: Write artifacts.json with all published regions
+        run: |
+          bun command/writeArtifacts.ts \
+            --package-version ${{ needs.prepare.outputs.package-version }} \
+            --bun-version ${{ needs.prepare.outputs.bun-version }} \
+            results/*.json
+          cat src/artifacts.json
 
       - name: Build
-        if: steps.check.outputs.skip == 'false'
         run: bun run build
         env:
-          BUN_VERSION: ${{ steps.bun.outputs.version }}
+          BUN_VERSION: ${{ needs.prepare.outputs.bun-version }}
 
       - name: Set version and pack
-        if: steps.check.outputs.skip == 'false'
         run: |
-          npm version "${{ steps.pkg.outputs.version }}" --no-git-tag-version
+          npm version "${{ needs.prepare.outputs.package-version }}" --no-git-tag-version
           npm pack
 
       - name: Create GitHub Release
-        if: steps.check.outputs.skip == 'false'
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: "v${{ steps.pkg.outputs.version }}"
-          name: "v${{ steps.pkg.outputs.version }}"
+          tag_name: "v${{ needs.prepare.outputs.package-version }}"
+          name: "v${{ needs.prepare.outputs.package-version }}"
           body: |
-            ## Lambda Bun Runtime v${{ steps.pkg.outputs.version }}
+            ## Lambda Bun Runtime v${{ needs.prepare.outputs.package-version }}
 
-            Built with Bun v${{ steps.bun.outputs.version }}
+            Built with Bun v${{ needs.prepare.outputs.bun-version }}
 
             ### Versioning
-            Package version `3.X.Y` where `X = bun_major*10000 + bun_minor*100 + bun_patch` and `Y` is the internal patch.
+            Package version `4.X.Y` where `X = bun_major*10000 + bun_minor*100 + bun_patch` and `Y` is the internal patch.
+
+            ### Published layer
+            The layer is public in `eu-north-1`, `eu-central-1`, `eu-west-1`, `us-east-1` and `us-west-2`. ARNs are in `artifacts.json`.
 
             ### Assets
-            - `bun-lambda-layer-${{ steps.bun.outputs.version }}.zip` — Prebuilt Lambda layer (Linux ARM64)
-          files: "dist/bun-lambda-layer-${{ steps.bun.outputs.version }}.zip"
+            - `bun-lambda-layer-${{ needs.prepare.outputs.bun-version }}.zip` - the layer zip (Linux ARM64) that was published
+            - `artifacts.json` - published layer ARNs per region
+          files: |
+            lib/bun-lambda-layer-${{ needs.prepare.outputs.bun-version }}.zip
+            src/artifacts.json
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish to npm
-        if: steps.check.outputs.skip == 'false'
         run: npm publish *.tgz --provenance --access public
