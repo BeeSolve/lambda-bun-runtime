@@ -1,7 +1,12 @@
 name: integration
 
 on:
-  workflow_call: {}
+  workflow_call:
+    inputs:
+      published-layer:
+        description: "Deploy the published layer (artifacts.json from the release run) instead of a layer built from source"
+        type: boolean
+        default: false
   workflow_dispatch: {}
   pull_request:
     paths:
@@ -41,6 +46,19 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - run: bun install --frozen-lockfile
+
+      - name: Use the published layer
+        if: inputs.published-layer
+        uses: actions/download-artifact@v8
+        with:
+          name: artifacts-json-first-region
+          path: src
+
+      - name: Build the layer from source
+        if: ${{ !inputs.published-layer }}
+        run: |
+          bun run build:layer
+          echo "BUN_LAYER_ZIP=$PWD/lib/bun-lambda-layer-$(cat .bun-version).zip" >> "$GITHUB_ENV"
 
       - run: bun run build
 
