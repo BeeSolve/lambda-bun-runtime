@@ -1,6 +1,14 @@
-# How to: Use another region or your own layer
+# How to: Use a layer instead of the runtime
 
 > Full working example: https://github.com/BeeSolve/lambda-bun-runtime/tree/main/examples/sample-app
+
+`BunFunctionWithLayer` runs Bun from a layer on `provided.al2023` instead of the customer-managed
+runtime. Create the layer with `BunLambdaLayer` and pass it as `bunLayer`:
+
+```ts
+const bunLayer = new BunLambdaLayer(this, "BunLayer");
+new BunFunctionWithLayer(this, "ApiFn", { entrypoint: `${__dirname}/api.ts`, bunLayer });
+```
 
 `new BunLambdaLayer(this, "BunLayer")` looks up the layer BeeSolve publishes for this
 package version in the stack's region (`eu-north-1`, `eu-central-1`, `eu-west-1`,

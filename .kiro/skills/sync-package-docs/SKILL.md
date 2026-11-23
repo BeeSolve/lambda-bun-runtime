@@ -12,7 +12,7 @@ This is the `@beesolve/lambda-bun-runtime` binding for the generic `agentic-pack
 - **Package:** `@beesolve/lambda-bun-runtime` - a SINGLE published package (not a monorepo). Docs live at the repo root (`DOCS.md`, `docs/how-to/`), not under `packages/`.
 - **Scope / repo / branch:** `@beesolve`, `https://github.com/BeeSolve/lambda-bun-runtime`, branch `main`. Org casing is `BeeSolve`.
 - **Install command:** `bun add` (primary); mention `npm install` as an alternative. `aws-cdk-lib` and `constructs` are peer dependencies.
-- **Public API (verify in `src/index.ts` before writing):** constructs `BunFunction`, `BunLambdaLayer`; types `BunFunctionProps`, `BunLambdaLayerProps`. These are CDK constructs - samples are CDK stack code, not SDK calls.
+- **Public API (verify in `src/index.ts` before writing):** constructs `BunFunction`, `BunFunctionWithLayer`, `BunLambdaLayer`; types `BunFunctionProps`, `BunFunctionWithLayerProps`, `BunRuntimeProps`, `BunLambdaLayerProps`. These are CDK constructs - samples are CDK stack code, not SDK calls.
 - **Example:** `examples/sample-app/` (a deployable CDK app, workspace member). It is the one Working Examples link. Confirm construct usage in `examples/sample-app/lib/sample-stack.ts`.
 - **Publish mechanism:** the `files` array in `package.json`. It must include `"dist/"`, `"docs/how-to"`, `"DOCS.md"`. There is no `.npmignore`.
 - **Keep OUT of the tarball:** `docs/adr-*.md` and any other `docs/*.md` that are not under `docs/how-to/` (e.g. `docs/aws-oidc-setup.md`). Never add the whole `"docs"` folder to `files`.

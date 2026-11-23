@@ -6,7 +6,7 @@
 
 - Packages the Bun binary into a Lambda Layer for ARM64/AL2023
 - Provides a minimal custom runtime (~80 lines) that implements the Lambda Runtime API loop
-- Exposes two CDK constructs: `BunLambdaLayer` and `BunFunction`
+- Exposes CDK constructs: `BunFunction` (customer-managed runtime, default), `BunFunctionWithLayer` and `BunLambdaLayer` (layer path)
 - Handlers use the standard Node.js-style `(event, context) => response` signature (not Fetch API)
 - `.ts` entrypoints are automatically built with Bun during CDK synth; `.js` files are used directly
 

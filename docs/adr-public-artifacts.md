@@ -27,8 +27,9 @@ Lambda customer-managed runtimes (CMR) reached GA. Findings from testing them ag
 - Runtime deletion is soft: `PENDING_DELETION` for 30 days, name reserved.
 - Cold start difference between CMR and the layer is real but modest for the Bun client
   (p50 about 444-480 ms for CMR against about 620-660 ms for the layer).
-- aws-cdk-lib 2.277.0 has no runtime resources and no `runtimeConfig` on `CfnFunction`. The AWS CLI
-  supports everything.
+- aws-cdk-lib 2.277.0 has no runtime resources and no `runtimeConfig` on `CfnFunction`. From 2.278.0
+  the `lambda.mixins.FunctionRuntimeConfig` mixin sets `runtimeConfig` on a function. There are still no
+  CDK resources for creating runtimes, so publishing uses the AWS CLI.
 
 ## Decision
 
@@ -50,10 +51,31 @@ Lambda customer-managed runtimes (CMR) reached GA. Findings from testing them ag
    - pass an explicit layer ARN or runtime ARN and alias
 6. Published layer versions and runtime versions are **never deleted**, because consumers' functions
    reference them.
-7. The CMR path ships as an addition (minor releases of 4.x). CDK has no support yet, so the first
-   version is documentation plus the CLI commands. A construct follows when CloudFormation and CDK
-   support `runtimeConfig`.
-8. Versioning keeps the scheme `<major>.<bun_major*10000 + bun_minor*100 + bun_patch>.<patch>`, with the
+7. **The customer-managed runtime is the default in v4.** `BunFunction` runs on the published CMR and
+   uses the `@beesolve/lambda-bun-runtime` ARN and alias for the stack's region from `artifacts.json`.
+   It applies `lambda.mixins.FunctionRuntimeConfig` (aws-cdk-lib 2.278.0 or newer). The optional prop
+   `bunRuntime: { runtimeArn, runtimeAlias }` overrides the ARN and alias, for internal tests and for
+   users who publish their own runtime. `BunFunctionWithLayer` is the separate construct for the layer
+   path. The two never share a construct.
+8. **Runtime aliases follow the Bun minor line.** Bun is pre-2.0 and minor releases can break things,
+   so the alias unit is `major.minor` instead of only the major as in the Node.js managed runtimes.
+   Per published runtime version CI sets:
+   - `pkg-<package version>`: set once per package version and never moved, the target of the release
+     integration test
+   - `<x.y.z>`: the Bun version pin, moves only for internal patch releases of the same Bun version
+   - `<x.y>`: the latest patch of the minor line, the default of `BunFunction`
+   - `<x>`: the latest release of the major, opt-in
+   - `latest`: the newest release, for internal tests
+
+   Patch releases move `<x.y>` and `<x>` automatically, but only after the integration test
+   passes against the new runtime version, and an alias never moves to an older version. A new minor creates a new `<x.y>` alias and leaves the
+   previous one in place. Only the newest minor line is patched automatically. Older lines keep their
+   last patch, because Bun does not maintain release branches for old minors. Users who need an old
+   line fix can pass an explicit alias or publish their own runtime. A new major creates `<x>` and
+   `<x.0>` and moves nothing across the boundary. Each package version pins its default alias in
+   `artifacts.json`.
+
+9. Versioning keeps the scheme `<major>.<bun_major*10000 + bun_minor*100 + bun_patch>.<patch>`, with the
    major bumped to 4.
 
 ## Consequences
@@ -62,15 +84,19 @@ Lambda customer-managed runtimes (CMR) reached GA. Findings from testing them ag
 
 - The tarball shrinks from tens of MB to a few KB, install is fast.
 - One layer per region instead of one per consumer stack and account.
-- CMR consumers get the faster cold start without building anything.
+- CMR is the default, so consumers get the faster cold start without building anything.
+- Patch fixes in Bun reach `<x.y>` users without a redeploy.
 
 ### Negative
 
-- **Breaking change.** Consumers outside the five regions must build the layer themselves or pass an ARN.
+- **Breaking change.** `BunFunction` is now CMR only, the layer path moved to `BunFunctionWithLayer`, and
+  aws-cdk-lib 2.278.0 or newer is required. Consumers outside the five regions must build the layer themselves or pass an ARN.
   The 3.x line remains the last version that works in every region.
 - Consumers depend on artifacts in a third-party account. Mitigations: never delete versions, put the
   git SHA and the zip SHA-256 in each layer version description and in the GitHub release notes, keep the
   build script so users can reproduce the layer.
+- Moving an alias changes running functions on their next cold start. A broken Bun patch would reach
+  `<x.y>` users, which is why the alias moves only after the integration test passes.
 - Release now has a publish step that must succeed in all five regions before `npm publish`, and must be
   idempotent for reruns.
 - The integration test needs a published layer for the version under test (see open questions).
@@ -85,26 +111,29 @@ Lambda customer-managed runtimes (CMR) reached GA. Findings from testing them ag
 2. **Public S3 zip as the layer source.** `PublishLayerVersion` accepts an S3 location, but it has to be
    in the same region as the layer, so it needs a public bucket per region and consumers still publish
    their own copy. A shared layer is simpler.
-3. **CMR only, drop the layer.** Not possible for all users: CMR is new, needs a recent CLI, has no CDK
-   support, and tenancy settings are account-gated in some accounts.
+3. **CMR only, drop the layer.** Not possible for all users: CMR is new, needs a recent CLI and
+   aws-cdk-lib, and tenancy settings are account-gated in some accounts. The layer stays as
+   `BunFunctionWithLayer`.
 4. **Per-consumer CMR built at deploy time (CDK asset and custom resource).** Needs Docker at synth and a
    custom resource that AWS will replace with a native resource.
 
 ## Resolved questions
 
 1. **Integration test ordering.** The release publishes to `eu-central-1` first, runs the integration
-   test against that published layer, and only then publishes the other regions and npm. Pull request
+   test against that published layer and runtime (alias `pkg-<package version>`), and only then publishes all regions
+   again (idempotent), sets the moving aliases, and publishes to npm. Pull request
    runs have no published layer and deploy a layer built from source (`BUN_LAYER_ZIP`).
 2. **Designated account.** The BeeSolve artifacts account, reached from GitHub Actions through an OIDC
    role limited to this repository and the `main` branch. Setup is in `docs/aws-oidc-setup-publish.md`.
-3. **Runtime image base.** The image is `provided:al2023` with the Bun binary copied from the official
-   `oven/bun:<version>` image. The binary is byte-identical to the one in the GitHub release zip and in
-   the layer (verified with SHA-256 for 1.4.4). The release job checks the hashes match and fails otherwise.
-4. **API shape.** `new BunLambdaLayer(scope, id)` resolves the published layer. Props `layerVersionArn`
-   or `assetZipPath` (mutually exclusive) select your own layer. `BunFunction.bunLayer` accepts any
+3. **Runtime image base.** The image is `provided:al2023` with the Bun binary from the GitHub release zip
+   that also goes into the layer, so layer and runtime contain the same binary by construction. The image
+   has no `ENTRYPOINT`, `CMD` or `RUN`. The runtime version name is the package version and the image
+   tag is the same name, so an internal patch release creates a new version.
+4. **API shape.** `BunFunction` is CMR. `BunFunctionWithLayer` takes `bunLayer`. `new BunLambdaLayer(scope, id)` resolves the published layer. Props `layerVersionArn`
+   or `assetZipPath` (mutually exclusive) select your own layer. `BunFunctionWithLayer.bunLayer` accepts any
    `ILayerVersion`. The shipped CLI `bun-lambda-runtime build-layer` builds the zip for `assetZipPath`.
 
 ## Open questions
 
 1. Adding regions later is a one-line change to the region list, opt-in regions need extra account setup.
-2. CMR construct: wait for CloudFormation and CDK `runtimeConfig` support, or ship a custom resource.
+2. Whether to patch the previous minor line automatically as well (current decision: no).

@@ -3,7 +3,7 @@
 A custom [Bun](https://bun.sh) runtime for AWS Lambda with CDK constructs for easy deployment.
 
 > [!NOTE]
-> **v4 no longer ships the layer zip in the npm package.** `BunLambdaLayer` now references a Bun layer that BeeSolve publishes for each release in these regions: `eu-north-1`, `eu-central-1`, `eu-west-1`, `us-east-1`, `us-west-2`. For any other region, pass your own layer (see [Other regions and your own layer](docs/how-to/custom-layer.md)). v3 is the last version that works in every region without extra steps. v3 was ESM-only and no longer a jsii package, see [ADR: Drop jsii](docs/adr-drop-jsii.md). The reasoning for v4 is in [ADR: Public artifacts](docs/adr-public-artifacts.md).
+> **v4 runs on a Lambda customer-managed runtime and no longer ships the layer zip in the npm package.** `BunFunction` uses a Bun runtime that BeeSolve publishes for each release in `eu-north-1`, `eu-central-1`, `eu-west-1`, `us-east-1` and `us-west-2`. It needs `aws-cdk-lib` 2.278.0 or newer. For other regions, [publish your own runtime](docs/how-to/custom-runtime.md) or [use a layer](docs/how-to/custom-layer.md) with `BunFunctionWithLayer`. v3 is the last version that works in every region without extra steps. v3 was ESM-only and no longer a jsii package, see [ADR: Drop jsii](docs/adr-drop-jsii.md). The reasoning for v4 is in [ADR: Public artifacts](docs/adr-public-artifacts.md).
 
 Current bun version: [1.4.5](https://bun.sh/blog/bun-v1.4.5)
 
@@ -15,13 +15,11 @@ npm i @beesolve/lambda-bun-runtime
 
 ## Quick Start
 
-Two constructs are provided: `BunLambdaLayer` (the runtime layer) and `BunFunction` (a Lambda function that uses it).
+`BunFunction` runs your handler on the Bun [customer-managed runtime](https://docs.aws.amazon.com/lambda/) that BeeSolve publishes. No layer is involved.
 
 ```ts
-import { BunLambdaLayer, BunFunction } from "@beesolve/lambda-bun-runtime";
+import { BunFunction } from "@beesolve/lambda-bun-runtime";
 import { Duration } from "aws-cdk-lib";
-
-const bunLayer = new BunLambdaLayer(this, "BunLayer");
 
 const apiHandler = new BunFunction(this, "ApiHandler", {
   entrypoint: `${__dirname}/api.ts`,
@@ -30,18 +28,22 @@ const apiHandler = new BunFunction(this, "ApiHandler", {
   environment: {
     STAGE: "prod",
   },
-  bunLayer,
 });
 ```
 
-The stack needs a concrete region (`env: { region: "eu-central-1" }`), because the published layer is looked up by region. Outside the published regions, or with an environment-agnostic stack, pass `layerVersionArn` or `assetZipPath`:
+The stack needs a concrete region (`env: { region: "eu-central-1" }`), because the published runtime is looked up by region. It requires `aws-cdk-lib` 2.278.0 or newer. The default alias is `<major>.<minor>` of the Bun version this package was built for, so Bun patch releases reach your function on its next cold start without a redeploy. To use a runtime you published yourself, or another alias, set `bunRuntime`:
 
 ```ts
-new BunLambdaLayer(this, "BunLayer", {
-  layerVersionArn: "arn:aws:lambda:eu-west-3:123456789012:layer:BunRuntime:1",
+new BunFunction(this, "ApiHandler", {
+  entrypoint: `${__dirname}/api.ts`,
+  bunRuntime: {
+    runtimeArn: "arn:aws:lambda:eu-west-3:123456789012:runtime/bun",
+    runtimeAlias: "latest",
+  },
 });
-new BunLambdaLayer(this, "BunLayer", { assetZipPath: "lib/bun-lambda-layer-1.4.4.zip" });
 ```
+
+Where the customer-managed runtime is not an option, `BunFunctionWithLayer` runs Bun from a layer (`BunLambdaLayer`) on `provided.al2023`. See [Use a layer instead of the runtime](./docs/how-to/custom-layer.md).
 
 `BunFunction` accepts `.ts` and `.js` entrypoints. TypeScript files are built with Bun automatically during CDK synth. JavaScript files are used as-is.
 

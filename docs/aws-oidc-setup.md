@@ -170,10 +170,13 @@ Save as `cfn-exec-policy.json`, replacing `<ACCOUNT_ID>` throughout. This covers
       ]
     },
     {
-      "Sid": "UsePublishedBunLayer",
+      "Sid": "UsePublishedBunArtifacts",
       "Effect": "Allow",
-      "Action": ["lambda:GetLayerVersion"],
-      "Resource": "arn:aws:lambda:eu-central-1:<ARTIFACTS_ACCOUNT_ID>:layer:BunRuntime:*"
+      "Action": ["lambda:GetLayerVersion", "lambda:AssociateRuntimeAlias"],
+      "Resource": [
+        "arn:aws:lambda:eu-central-1:<ARTIFACTS_ACCOUNT_ID>:layer:BunRuntime:*",
+        "arn:aws:lambda:eu-central-1:<ARTIFACTS_ACCOUNT_ID>:runtime/bun/alias/*"
+      ]
     },
     {
       "Sid": "IAMPassAndManageLambdaRoles",
