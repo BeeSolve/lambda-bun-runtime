@@ -103,6 +103,12 @@ jobs:
           name: layer-zip
           path: lib
 
+      - name: Install the latest AWS CLI
+        run: |
+          curl -sSf https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o awscliv2.zip
+          unzip -q awscliv2.zip
+          sudo ./aws/install --update
+
       - uses: aws-actions/configure-aws-credentials@v6
         with:
           role-to-assume: ${{ secrets.AWS_PUBLISH_ROLE_ARN }}
@@ -119,23 +125,28 @@ jobs:
             --git-sha ${{ github.sha }} \
             --out results/eu-central-1.json
 
+      # Only the alias named after the package version exists at this point. The moving aliases
+      # (x.y.z, x.y, x, latest) are set after the integration test passed.
+      - name: Publish runtime in eu-central-1
+        run: |
+          bun command/publishRuntime.ts \
+            --region eu-central-1 \
+            ${{ needs.prepare.outputs.bun-version }} \
+            --version-name ${{ needs.prepare.outputs.package-version }} \
+            --alias pkg-${{ needs.prepare.outputs.package-version }} \
+            --out results/eu-central-1-runtime.json
+
       - name: Write artifacts.json for the integration test
         run: |
           bun command/writeArtifacts.ts \
             --package-version ${{ needs.prepare.outputs.package-version }} \
             --bun-version ${{ needs.prepare.outputs.bun-version }} \
-            results/eu-central-1.json
+            results/eu-central-1.json results/eu-central-1-runtime.json
 
       - uses: actions/upload-artifact@v7
         with:
           name: artifacts-json-first-region
           path: src/artifacts.json
-          if-no-files-found: error
-
-      - uses: actions/upload-artifact@v7
-        with:
-          name: layer-result-eu-central-1
-          path: results/eu-central-1.json
           if-no-files-found: error
 
   integration_test:
@@ -145,7 +156,9 @@ jobs:
       published-layer: true
     secrets: inherit
 
-  publish-other-regions:
+  # All five regions, including the first one: publishing is idempotent, and this is where the
+  # moving aliases are set, after the integration test passed.
+  publish-regions:
     needs: [prepare, integration_test]
     runs-on: ubuntu-24.04
     permissions:
@@ -154,7 +167,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        region: [eu-north-1, eu-west-1, us-east-1, us-west-2]
+        region: [eu-central-1, eu-north-1, eu-west-1, us-east-1, us-west-2]
     steps:
       - uses: actions/checkout@v6
 
@@ -168,6 +181,12 @@ jobs:
         with:
           name: layer-zip
           path: lib
+
+      - name: Install the latest AWS CLI
+        run: |
+          curl -sSf https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip -o awscliv2.zip
+          unzip -q awscliv2.zip
+          sudo ./aws/install --update
 
       - uses: aws-actions/configure-aws-credentials@v6
         with:
@@ -185,14 +204,25 @@ jobs:
             --git-sha ${{ github.sha }} \
             --out results/${{ matrix.region }}.json
 
+      - name: Publish runtime in ${{ matrix.region }}
+        run: |
+          bun command/publishRuntime.ts \
+            --region ${{ matrix.region }} \
+            ${{ needs.prepare.outputs.bun-version }} \
+            --version-name ${{ needs.prepare.outputs.package-version }} \
+            --alias pkg-${{ needs.prepare.outputs.package-version }} \
+            --release-aliases \
+            --public \
+            --out results/${{ matrix.region }}-runtime.json
+
       - uses: actions/upload-artifact@v7
         with:
-          name: layer-result-${{ matrix.region }}
-          path: results/${{ matrix.region }}.json
+          name: region-result-${{ matrix.region }}
+          path: results/*.json
           if-no-files-found: error
 
   release:
-    needs: [prepare, build-layer, publish-other-regions]
+    needs: [prepare, build-layer, publish-regions]
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -220,7 +250,7 @@ jobs:
 
       - uses: actions/download-artifact@v8
         with:
-          pattern: layer-result-*
+          pattern: region-result-*
           merge-multiple: true
           path: results
 
@@ -255,12 +285,13 @@ jobs:
             ### Versioning
             Package version `4.X.Y` where `X = bun_major*10000 + bun_minor*100 + bun_patch` and `Y` is the internal patch.
 
-            ### Published layer
-            The layer is public in `eu-north-1`, `eu-central-1`, `eu-west-1`, `us-east-1` and `us-west-2`. ARNs are in `artifacts.json`.
+            ### Published artifacts
+            The layer and the customer-managed runtime are public in `eu-north-1`, `eu-central-1`, `eu-west-1`, `us-east-1` and `us-west-2`. ARNs are in `artifacts.json`.
+            Runtime aliases: `<x.y.z>`, `<x.y>` (the `BunFunction` default, follows patch releases), `<x>` and `latest`.
 
             ### Assets
             - `bun-lambda-layer-${{ needs.prepare.outputs.bun-version }}.zip` - the layer zip (Linux ARM64) that was published
-            - `artifacts.json` - published layer ARNs per region
+            - `artifacts.json` - published layer and runtime ARNs per region
           files: |
             lib/bun-lambda-layer-${{ needs.prepare.outputs.bun-version }}.zip
             src/artifacts.json

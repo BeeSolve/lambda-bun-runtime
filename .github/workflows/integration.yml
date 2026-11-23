@@ -54,6 +54,10 @@ jobs:
           name: artifacts-json-first-region
           path: src
 
+      - name: Deploy the function on the published runtime too
+        if: inputs.published-layer
+        run: echo "BUN_CMR=1" >> "$GITHUB_ENV"
+
       - name: Build the layer from source
         if: ${{ !inputs.published-layer }}
         run: |

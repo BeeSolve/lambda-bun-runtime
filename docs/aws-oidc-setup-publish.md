@@ -4,7 +4,8 @@ One-time setup so the `release.yml` workflow can publish the public Bun layer to
 artifacts account without long-lived credentials. This is separate from the integration test role in
 [aws-oidc-setup.md](./aws-oidc-setup.md), which lives in a sandbox account.
 
-The role can publish and share one layer (`BunRuntime`) in five regions. It cannot touch anything else.
+The role can publish and share one layer (`BunRuntime`) and one customer-managed runtime (`bun`,
+with its ECR repository `bun`) in five regions. It cannot touch anything else.
 
 Regions: `eu-north-1`, `eu-central-1`, `eu-west-1`, `us-east-1`, `us-west-2`.
 
@@ -12,7 +13,8 @@ Regions: `eu-north-1`, `eu-central-1`, `eu-west-1`, `us-east-1`, `us-west-2`.
 
 - AWS CLI with admin access to the artifacts account (profile `customer-managed-runtimes-prod`)
 - GitHub CLI (`gh`) authenticated to the repo
-- No SCP in the account or organization that blocks `lambda:AddLayerVersionPermission` with `Principal: "*"`
+- No SCP in the account or organization that blocks `lambda:AddLayerVersionPermission` or
+  `lambda:PutResourcePolicy` with `Principal: "*"`
 
 Set these once for the commands below:
 
@@ -68,7 +70,9 @@ EOT
 ## Step 3 - Permissions policy
 
 The workflow calls `PublishLayerVersion`, `ListLayerVersions` (to make reruns idempotent) and
-`AddLayerVersionPermission` (to share the layer with all accounts).
+`AddLayerVersionPermission` (to share the layer with all accounts). For the runtime it creates the ECR
+repository and pushes the image, creates the runtime, its versions and aliases, and puts a resource policy
+on the runtime ARN.
 
 ```bash
 cat > publish-policy.json <<EOT
@@ -96,14 +100,65 @@ cat > publish-policy.json <<EOT
           "aws:RequestedRegion": ["eu-north-1", "eu-central-1", "eu-west-1", "us-east-1", "us-west-2"]
         }
       }
+    },
+    {
+      "Sid": "EcrLogin",
+      "Effect": "Allow",
+      "Action": ["ecr:GetAuthorizationToken"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "PushBunRuntimeImage",
+      "Effect": "Allow",
+      "Action": [
+        "ecr:CreateRepository",
+        "ecr:DescribeRepositories",
+        "ecr:SetRepositoryPolicy",
+        "ecr:DescribeImages",
+        "ecr:BatchGetImage",
+        "ecr:GetDownloadUrlForLayer",
+        "ecr:BatchCheckLayerAvailability",
+        "ecr:InitiateLayerUpload",
+        "ecr:UploadLayerPart",
+        "ecr:CompleteLayerUpload",
+        "ecr:PutImage"
+      ],
+      "Resource": "arn:aws:ecr:*:${ACCOUNT_ID}:repository/bun",
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": ["eu-north-1", "eu-central-1", "eu-west-1", "us-east-1", "us-west-2"]
+        }
+      }
+    },
+    {
+      "Sid": "PublishBunRuntime",
+      "Effect": "Allow",
+      "Action": [
+        "lambda:CreateRuntime",
+        "lambda:GetRuntime",
+        "lambda:CreateRuntimeVersion",
+        "lambda:GetRuntimeVersion",
+        "lambda:CreateRuntimeAlias",
+        "lambda:UpdateRuntimeAlias",
+        "lambda:GetRuntimeAlias",
+        "lambda:PutResourcePolicy",
+        "lambda:GetResourcePolicy"
+      ],
+      "Resource": ["arn:aws:lambda:*:${ACCOUNT_ID}:runtime/bun", "arn:aws:lambda:*:${ACCOUNT_ID}:runtime/bun/*"],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": ["eu-north-1", "eu-central-1", "eu-west-1", "us-east-1", "us-west-2"]
+        }
+      }
     }
   ]
 }
 EOT
 ```
 
-> The resource types of `ListLayerVersions` and `PublishLayerVersion` were not verified against the
-> IAM reference for this policy. If the first release fails with `AccessDenied`, read the denied action and
+> The runtime and ECR actions come from the Lambda documentation on customer-managed runtimes
+> (`ecr:BatchGetImage` and `ecr:GetDownloadUrlForLayer` are required to create a runtime version). The
+> resource types of `ListLayerVersions` and `PublishLayerVersion` were not verified against the IAM reference. If the first release fails with `AccessDenied`, read the denied action and
 > resource from the error message and adjust this policy. Do not widen it to `lambda:*` on `*`.
 
 ---
@@ -147,9 +202,12 @@ artifacts account ID in place of `<ARTIFACTS_ACCOUNT_ID>`.
 
 ## What the release does with this role
 
-1. Publishes the layer in `eu-central-1`, runs the integration test against it.
-2. Publishes the layer in the other four regions.
+1. Publishes the layer and the runtime version in `eu-central-1`. The runtime gets only the alias
+   `pkg-<package version>`. The integration test runs against it.
+2. In all five regions, publishes the layer and the runtime version (idempotent), sets the moving aliases
+   `<x.y.z>`, `<x.y>`, `<x>` and `latest`, and makes the runtime public.
 3. Only then publishes to npm.
 
-Layer versions are never deleted: consumers' functions reference them. Reruns are safe, a layer version whose
-description names the package version is reused.
+Layer versions and runtime versions are never deleted: consumers' functions reference them. Reruns are safe.
+A layer version whose description names the package version is reused, and so are an existing image tag
+and runtime version. A moving alias never moves to an older version.

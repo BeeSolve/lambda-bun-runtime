@@ -1,6 +1,6 @@
 # @beesolve/lambda-bun-runtime - Documentation
 
-**Keywords:** aws lambda, bun runtime, bun layer, cdk construct, BunFunction, BunLambdaLayer, BunLambdaLayerProps, layerVersionArn, assetZipPath, build-layer, PROVIDED_AL2023, arm64, custom runtime, lambda layer, region, entrypoint, response streaming, function url
+**Keywords:** aws lambda, bun runtime, bun layer, cdk construct, BunFunction, BunFunctionWithLayer, BunLambdaLayer, BunLambdaLayerProps, bunRuntime, runtimeArn, runtimeAlias, customer-managed runtime, CMR, publish-runtime, layerVersionArn, assetZipPath, build-layer, PROVIDED_AL2023, arm64, custom runtime, lambda layer, region, entrypoint, response streaming, function url
 
 > This documentation is published inside the installed package and matches the installed version. Prefer it over prior knowledge or older examples found online.
 
@@ -8,19 +8,20 @@
 
 ## How-To Guides
 
-| Guide                                                             | Description                                                                    |
-| ----------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| [Getting Started](./docs/how-to/getting-started.md)               | Install, add the Bun layer, and deploy your first Bun Lambda via CDK           |
-| [Other regions and your own layer](./docs/how-to/custom-layer.md) | Use a layer ARN or build the layer zip when your region has no published layer |
+| Guide                                                               | Description                                                                  |
+| ------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| [Getting Started](./docs/how-to/getting-started.md)                 | Install and deploy your first Bun Lambda on the Bun customer-managed runtime |
+| [Publish your own runtime](./docs/how-to/custom-runtime.md)         | Publish the runtime in your account or region with `publish-runtime`         |
+| [Use a layer instead of the runtime](./docs/how-to/custom-layer.md) | `BunFunctionWithLayer`, a layer ARN, or a layer zip you build yourself       |
 
 ## Working Examples
 
 The [examples/sample-app](https://github.com/BeeSolve/lambda-bun-runtime/tree/main/examples/sample-app)
 directory in the repository is a deployable CDK app demonstrating real-world usage:
 
-| Example                                                                                    | What it shows                                                                                                          |
-| ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------- |
-| [sample-app](https://github.com/BeeSolve/lambda-bun-runtime/tree/main/examples/sample-app) | `BunFunction` + `BunLambdaLayer` across HTTP v1/v2, Function URL, response streaming, direct invoke, and Bun-native S3 |
+| Example                                                                                    | What it shows                                                                                                                                     |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [sample-app](https://github.com/BeeSolve/lambda-bun-runtime/tree/main/examples/sample-app) | `BunFunctionWithLayer` + `BunLambdaLayer` and `BunFunction` across HTTP v1/v2, Function URL, response streaming, direct invoke, and Bun-native S3 |
 
 ## Further Reading
 

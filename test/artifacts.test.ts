@@ -10,7 +10,7 @@ const artifacts: Artifacts = {
     "eu-central-1": {
       layerVersionArn: "arn:aws:lambda:eu-central-1:123456789012:layer:BunRuntime:7",
       runtimeArn: "arn:aws:lambda:eu-central-1:123456789012:runtime/bun",
-      runtimeAlias: "bun-1.4.4",
+      runtimeAlias: "1.4.4",
     },
     "us-east-1": {
       layerVersionArn: "arn:aws:lambda:us-east-1:123456789012:layer:BunRuntime:9",
