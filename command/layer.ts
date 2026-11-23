@@ -78,7 +78,7 @@ function defaultOutDir(): string {
   return isRepositoryLayout() ? resolve(import.meta.dir, "..", "lib") : process.cwd();
 }
 
-function resolveVersion(props: { cliVersion?: string }): string {
+export function resolveVersion(props: { cliVersion?: string }): string {
   if (props.cliVersion != null) return props.cliVersion;
   const envVar = process.env.BUN_VERSION;
   if (envVar != null) return envVar;
@@ -96,7 +96,7 @@ function resolveVersion(props: { cliVersion?: string }): string {
   process.exit(1);
 }
 
-function validateVersion(props: { version: string }): void {
+export function validateVersion(props: { version: string }): void {
   const semverPattern = /^([1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 
   if (!semverPattern.test(props.version)) {
@@ -105,7 +105,10 @@ function validateVersion(props: { version: string }): void {
   }
 }
 
-async function downloadBunBinary(props: { version: string; tmpDir: string }): Promise<string> {
+export async function downloadBunBinary(props: {
+  version: string;
+  tmpDir: string;
+}): Promise<string> {
   const url = `https://github.com/oven-sh/bun/releases/download/bun-v${props.version}/bun-linux-aarch64.zip`;
 
   console.log(`Downloading Bun v${props.version} from ${url}...`);
@@ -134,7 +137,10 @@ async function downloadBunBinary(props: { version: string; tmpDir: string }): Pr
   return zipPath;
 }
 
-async function extractBunBinary(props: { zipPath: string; tmpDir: string }): Promise<string> {
+export async function extractBunBinary(props: {
+  zipPath: string;
+  tmpDir: string;
+}): Promise<string> {
   console.log("Extracting Bun binary...");
 
   const proc = Bun.spawnSync(["unzip", "-o", props.zipPath, "-d", props.tmpDir]);
@@ -155,7 +161,7 @@ async function extractBunBinary(props: { zipPath: string; tmpDir: string }): Pro
   process.exit(1);
 }
 
-async function compileRuntime(props: { tmpDir: string }): Promise<string> {
+export async function compileRuntime(props: { tmpDir: string }): Promise<string> {
   console.log("Compiling runtime...");
 
   const runtimeSource = resolve(import.meta.dir, "runtime.mts");

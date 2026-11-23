@@ -1,7 +1,15 @@
 import { basename, dirname } from "node:path";
 
 import { RemovalPolicy, Resource, Stack, Token } from "aws-cdk-lib";
-import { Architecture, Code, Function, LayerVersion, Runtime } from "aws-cdk-lib/aws-lambda";
+import {
+  Architecture,
+  Code,
+  Function,
+  LayerVersion,
+  Runtime,
+  RuntimeFamily,
+  mixins,
+} from "aws-cdk-lib/aws-lambda";
 import type { FunctionProps, ILayerVersion, LayerVersionPermission } from "aws-cdk-lib/aws-lambda";
 import { LogGroup, RetentionDays } from "aws-cdk-lib/aws-logs";
 import type { Construct } from "constructs";
@@ -10,7 +18,9 @@ import { publishedArtifacts, resolveRegionArtifacts } from "./artifacts";
 
 const bunVersion = "1.4.5";
 
-export interface BunFunctionProps extends Omit<
+const customRuntime = new Runtime("custom", RuntimeFamily.OTHER);
+
+export interface BunFunctionBaseProps extends Omit<
   FunctionProps,
   "runtime" | "architecture" | "handler" | "code"
 > {
@@ -28,32 +38,62 @@ export interface BunFunctionProps extends Omit<
    * @default "handler"
    */
   readonly exportName?: string;
+}
+
+export interface BunRuntimeProps {
+  /**
+   * ARN of the customer-managed runtime. Defaults to the runtime BeeSolve publishes
+   * in the stack's region. Set it to use a runtime you built and published yourself.
+   */
+  readonly runtimeArn?: string;
 
   /**
-   * Bun layer needs to be set.
+   * Runtime alias. Defaults to the alias published with this package version,
+   * or `latest` when `runtimeArn` is given.
+   */
+  readonly runtimeAlias?: string;
+}
+
+export interface BunFunctionProps extends BunFunctionBaseProps {
+  /**
+   * Override the customer-managed runtime. Without it the function uses the
+   * runtime BeeSolve publishes for this package version.
+   */
+  readonly bunRuntime?: BunRuntimeProps;
+}
+
+/**
+ * A Lambda function running on the Bun customer-managed runtime (CMR).
+ */
+export class BunFunction extends Function {
+  constructor(scope: Construct, id: string, props: BunFunctionProps) {
+    const runtimeConfig = resolveRuntimeConfig({ scope, runtime: props.bunRuntime ?? {} });
+
+    super(scope, id, {
+      ...baseFunctionProps({ scope, id, props }),
+      runtime: customRuntime,
+    });
+
+    this.with(runtimeConfig);
+  }
+}
+
+export interface BunFunctionWithLayerProps extends BunFunctionBaseProps {
+  /**
+   * The Bun layer the function runs on.
    */
   readonly bunLayer: ILayerVersion;
 }
 
-export class BunFunction extends Function {
-  constructor(scope: Construct, id: string, props: BunFunctionProps) {
-    const derivedBasename = deriveBasename({ entrypoint: props.entrypoint });
-    const handler = `${derivedBasename}.${props.exportName ?? "handler"}`;
-    const code = resolveCode({ entrypoint: props.entrypoint, derivedBasename });
-
+/**
+ * A Lambda function running Bun from a layer on `provided.al2023`.
+ * Use it where the customer-managed runtime is not available.
+ */
+export class BunFunctionWithLayer extends Function {
+  constructor(scope: Construct, id: string, props: BunFunctionWithLayerProps) {
     super(scope, id, {
-      logGroup:
-        props.logGroup ??
-        new LogGroup(scope, `${id}LogGroup`, {
-          logGroupName: `/aws/lambda/${Stack.of(scope).stackName}-${id}`,
-          removalPolicy: RemovalPolicy.DESTROY,
-          retention: RetentionDays.TWO_WEEKS,
-        }),
-      ...props,
-      code,
-      handler,
+      ...baseFunctionProps({ scope, id, props }),
       runtime: Runtime.PROVIDED_AL2023,
-      architecture: Architecture.ARM_64,
       layers: [props.bunLayer, ...(props.layers ?? [])],
     });
   }
@@ -123,6 +163,54 @@ export class BunLambdaLayer extends Resource implements ILayerVersion {
   public addPermission(id: string, permission: LayerVersionPermission): void {
     this.layer.addPermission(id, permission);
   }
+}
+
+function baseFunctionProps(props: {
+  readonly scope: Construct;
+  readonly id: string;
+  readonly props: BunFunctionBaseProps;
+}): FunctionProps {
+  const derivedBasename = deriveBasename({ entrypoint: props.props.entrypoint });
+  return {
+    logGroup:
+      props.props.logGroup ??
+      new LogGroup(props.scope, `${props.id}LogGroup`, {
+        logGroupName: `/aws/lambda/${Stack.of(props.scope).stackName}-${props.id}`,
+        removalPolicy: RemovalPolicy.DESTROY,
+        retention: RetentionDays.TWO_WEEKS,
+      }),
+    ...props.props,
+    code: resolveCode({ entrypoint: props.props.entrypoint, derivedBasename }),
+    handler: `${derivedBasename}.${props.props.exportName ?? "handler"}`,
+    runtime: customRuntime,
+    architecture: Architecture.ARM_64,
+  };
+}
+
+function resolveRuntimeConfig(props: {
+  readonly scope: Construct;
+  readonly runtime: BunRuntimeProps;
+}): mixins.FunctionRuntimeConfig {
+  if (props.runtime.runtimeArn != null) {
+    return new mixins.FunctionRuntimeConfig({
+      runtimeArn: props.runtime.runtimeArn,
+      runtimeAlias: props.runtime.runtimeAlias ?? "latest",
+    });
+  }
+
+  const published = resolveRegionArtifacts({
+    region: concreteRegion({ scope: props.scope }),
+    artifacts: publishedArtifacts,
+  });
+  if (published.runtimeArn == null || published.runtimeAlias == null) {
+    throw new Error(
+      "No published Bun runtime for this region. Set bunRuntime.runtimeArn to use your own runtime, or use BunFunctionWithLayer.",
+    );
+  }
+  return new mixins.FunctionRuntimeConfig({
+    runtimeArn: published.runtimeArn,
+    runtimeAlias: props.runtime.runtimeAlias ?? published.runtimeAlias,
+  });
 }
 
 function concreteRegion(props: { readonly scope: Construct }): string {

@@ -4,10 +4,10 @@ import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 
 import { App, Stack } from "aws-cdk-lib";
-import { Template } from "aws-cdk-lib/assertions";
+import { Match, Template } from "aws-cdk-lib/assertions";
 import * as fc from "fast-check";
 
-import { BunFunction, BunLambdaLayer } from "../src/index";
+import { BunFunction, BunFunctionWithLayer, BunLambdaLayer } from "../src/index";
 
 const testLayerArn = "arn:aws:lambda:eu-central-1:123456789012:layer:BunRuntime:7";
 
@@ -92,12 +92,12 @@ describe("BunFunction handler derivation (Property 5)", () => {
 });
 
 describe("CDK construct unit tests", () => {
-  test("BunFunction with .js entrypoint produces correct handler string", () => {
+  test("BunFunctionWithLayer with .js entrypoint produces correct handler string", () => {
     const app = new App();
     const stack = new Stack(app, "TestStack");
     const bunLayer = new BunLambdaLayer(stack, "Layer", { layerVersionArn: testLayerArn });
 
-    new BunFunction(stack, "Fn", {
+    new BunFunctionWithLayer(stack, "Fn", {
       entrypoint: `${__dirname}/fixtures/api.js`,
       bunLayer,
     });
@@ -108,12 +108,12 @@ describe("CDK construct unit tests", () => {
     });
   });
 
-  test("BunFunction with .ts entrypoint uses Code.fromCustomCommand", () => {
+  test("BunFunctionWithLayer with .ts entrypoint uses Code.fromCustomCommand", () => {
     const app = new App();
     const stack = new Stack(app, "TestStack");
     const bunLayer = new BunLambdaLayer(stack, "Layer", { layerVersionArn: testLayerArn });
 
-    new BunFunction(stack, "Fn", {
+    new BunFunctionWithLayer(stack, "Fn", {
       entrypoint: `${__dirname}/fixtures/handler.ts`,
       bunLayer,
     });
@@ -124,12 +124,12 @@ describe("CDK construct unit tests", () => {
     });
   });
 
-  test("BunFunction with explicit exportName uses provided value", () => {
+  test("BunFunctionWithLayer with explicit exportName uses provided value", () => {
     const app = new App();
     const stack = new Stack(app, "TestStack");
     const bunLayer = new BunLambdaLayer(stack, "Layer", { layerVersionArn: testLayerArn });
 
-    new BunFunction(stack, "Fn", {
+    new BunFunctionWithLayer(stack, "Fn", {
       entrypoint: `${__dirname}/fixtures/api.js`,
       exportName: "myExport",
       bunLayer,
@@ -141,12 +141,12 @@ describe("CDK construct unit tests", () => {
     });
   });
 
-  test("BunFunction does NOT use .fetch as default export", () => {
+  test("BunFunctionWithLayer does NOT use .fetch as default export", () => {
     const app = new App();
     const stack = new Stack(app, "TestStack");
     const bunLayer = new BunLambdaLayer(stack, "Layer", { layerVersionArn: testLayerArn });
 
-    new BunFunction(stack, "Fn", {
+    new BunFunctionWithLayer(stack, "Fn", {
       entrypoint: `${__dirname}/fixtures/api.js`,
       bunLayer,
     });
@@ -178,7 +178,7 @@ describe("CDK construct unit tests", () => {
     const stack = new Stack(app, "TestStack");
     const bunLayer = new BunLambdaLayer(stack, "Layer", { layerVersionArn: testLayerArn });
 
-    new BunFunction(stack, "Fn", {
+    new BunFunctionWithLayer(stack, "Fn", {
       entrypoint: `${__dirname}/fixtures/api.js`,
       bunLayer,
     });
@@ -208,12 +208,12 @@ describe("CDK construct unit tests", () => {
     expect(() => new BunLambdaLayer(stack, "Layer")).toThrow(/needs a concrete region/);
   });
 
-  test("BunFunction uses PROVIDED_AL2023 runtime and ARM_64 architecture", () => {
+  test("BunFunctionWithLayer uses PROVIDED_AL2023 runtime and ARM_64 architecture", () => {
     const app = new App();
     const stack = new Stack(app, "TestStack");
     const bunLayer = new BunLambdaLayer(stack, "Layer", { layerVersionArn: testLayerArn });
 
-    new BunFunction(stack, "Fn", {
+    new BunFunctionWithLayer(stack, "Fn", {
       entrypoint: `${__dirname}/fixtures/api.js`,
       bunLayer,
     });
@@ -223,5 +223,37 @@ describe("CDK construct unit tests", () => {
       Runtime: "provided.al2023",
       Architectures: ["arm64"],
     });
+  });
+});
+
+describe("BunFunction on a customer-managed runtime", () => {
+  const runtimeArn = "arn:aws:lambda:eu-central-1:123456789012:runtime/bun";
+  const entrypoint = `${import.meta.dir}/fixtures/api.js` as const;
+
+  test("sets runtimeConfig, the custom runtime and no layer", () => {
+    const stack = new Stack(new App(), "Cmr", { env: { region: "eu-central-1" } });
+    new BunFunction(stack, "Fn", {
+      entrypoint,
+      bunRuntime: { runtimeArn, runtimeAlias: "stable" },
+    });
+    Template.fromStack(stack).hasResourceProperties("AWS::Lambda::Function", {
+      Runtime: "custom",
+      Architectures: ["arm64"],
+      RuntimeConfig: { RuntimeArn: runtimeArn, RuntimeAlias: "stable" },
+      Layers: Match.absent(),
+    });
+  });
+
+  test("alias defaults to latest when only the ARN is given", () => {
+    const stack = new Stack(new App(), "CmrDefault", { env: { region: "eu-central-1" } });
+    new BunFunction(stack, "Fn", { entrypoint, bunRuntime: { runtimeArn } });
+    Template.fromStack(stack).hasResourceProperties("AWS::Lambda::Function", {
+      RuntimeConfig: { RuntimeArn: runtimeArn, RuntimeAlias: "latest" },
+    });
+  });
+
+  test("without an override it needs a published runtime for the region", () => {
+    const stack = new Stack(new App(), "CmrNone", { env: { region: "eu-central-1" } });
+    expect(() => new BunFunction(stack, "Fn", { entrypoint })).toThrow("No published Bun layer");
   });
 });
