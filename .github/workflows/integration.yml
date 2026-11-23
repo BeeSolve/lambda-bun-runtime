@@ -54,15 +54,21 @@ jobs:
           name: artifacts-json-first-region
           path: src
 
-      - name: Deploy the function on the published runtime too
-        if: inputs.published-layer
-        run: echo "BUN_CMR=1" >> "$GITHUB_ENV"
-
       - name: Build the layer from source
         if: ${{ !inputs.published-layer }}
         run: |
           bun run build:layer
           echo "BUN_LAYER_ZIP=$PWD/lib/bun-lambda-layer-$(cat .bun-version).zip" >> "$GITHUB_ENV"
+
+      # PR runs have no fresh release, so the CMR echo function points at the runtime published
+      # by the latest GitHub release instead of the stack's region lookup.
+      - name: Resolve the published runtime for PR runs
+        if: ${{ !inputs.published-layer }}
+        run: |
+          curl -sSfL -o /tmp/artifacts.json \
+            https://github.com/${{ github.repository }}/releases/latest/download/artifacts.json
+          echo "BUN_RUNTIME_ARN=$(jq -r '.regions["eu-central-1"].runtimeArn' /tmp/artifacts.json)" >> "$GITHUB_ENV"
+          echo "BUN_RUNTIME_ALIAS=$(jq -r '.regions["eu-central-1"].runtimeAlias' /tmp/artifacts.json)" >> "$GITHUB_ENV"
 
       - run: bun run build
 

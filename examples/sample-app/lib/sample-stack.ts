@@ -54,12 +54,15 @@ export class SampleStack extends Stack {
       bunLayer,
     });
 
-    // Echo on the customer-managed runtime. Needs the published runtime for the stack's region,
-    // so it is only deployed when BUN_CMR=1 (release runs).
-    const cmrEchoFn =
-      process.env.BUN_CMR === "1"
-        ? new BunFunction(this, "CmrEchoFn", { entrypoint: src("echo.ts") })
-        : undefined;
+    // Echo on the customer-managed runtime (CMR) — no layer involved. Uses the published
+    // runtime for the stack's region by default; BUN_RUNTIME_ARN/BUN_RUNTIME_ALIAS override it
+    // for PR runs, which have no release yet and use artifacts.json from the latest GitHub release.
+    const runtimeArn = process.env.BUN_RUNTIME_ARN;
+    const runtimeAlias = process.env.BUN_RUNTIME_ALIAS;
+    const cmrEchoFn = new BunFunction(this, "CmrEchoFn", {
+      entrypoint: src("echo.ts"),
+      ...(runtimeArn == null ? {} : { bunRuntime: { runtimeArn, runtimeAlias } }),
+    });
 
     // Streaming — async generator handler, invoked via InvokeWithResponseStream
     const streamingFn = new BunFunctionWithLayer(this, "StreamingFn", {
@@ -90,9 +93,7 @@ export class SampleStack extends Stack {
     new CfnOutput(this, "HttpV2PlainFunctionUrl", { value: plainFnUrl.url });
     new CfnOutput(this, "HttpV1RestApiUrl", { value: restApi.url });
     new CfnOutput(this, "EchoFnArn", { value: echoFn.functionArn });
-    if (cmrEchoFn != null) {
-      new CfnOutput(this, "CmrEchoFnArn", { value: cmrEchoFn.functionArn });
-    }
+    new CfnOutput(this, "CmrEchoFnArn", { value: cmrEchoFn.functionArn });
     new CfnOutput(this, "S3WriterFnArn", { value: s3WriterFn.functionArn });
     new CfnOutput(this, "TestBucketName", { value: testBucket.bucketName });
     new CfnOutput(this, "StreamingFnArn", { value: streamingFn.functionArn });
