@@ -52,7 +52,7 @@
     "lint": "oxlint .",
     "test": "bun test",
     "integ:deploy-test-destroy": "RUN_AWS_INTEG=1 bun test test/integration/deploy-destroy.test.ts",
-    "integ:cleanup": "bash -lc \"set -euo pipefail; stacks=$(aws cloudformation list-stacks --stack-status-filter CREATE_COMPLETE UPDATE_COMPLETE UPDATE_ROLLBACK_COMPLETE ROLLBACK_COMPLETE --query 'StackSummaries[].StackName' --output text); for stack in $stacks; do case \\\"$stack\\\" in BunLayerInteg-*) echo \\\"Destroying $stack\\\"; (cd examples/sample-app && INTEG_STACK_NAME=\\\"$stack\\\" bunx cdk destroy \\\"$stack\\\" --force);; esac; done\""
+    "integ:cleanup": "bash command/cleanupIntegStacks.sh"
   },
   "devDependencies": {
     "@aws-sdk/client-lambda": "3.1077.0",
