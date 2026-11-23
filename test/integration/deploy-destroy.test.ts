@@ -29,6 +29,7 @@ interface StackOutputs {
   HttpV2PlainFunctionUrl: string;
   HttpV1RestApiUrl: string;
   EchoFnArn: string;
+  CmrEchoFnArn?: string;
   S3WriterFnArn: string;
   TestBucketName: string;
   StreamingFnArn: string;
@@ -125,6 +126,12 @@ describeInteg(
       expect(body.eventVersion).toBe("v1");
       expect(body.requestCookie).toBe("from-client");
       assertSetCookieHeader(res.headers);
+    });
+
+    test("direct invoke echo on the customer-managed runtime", async () => {
+      if (outputs.CmrEchoFnArn == null) return;
+      const result = await invokeLambda(outputs.CmrEchoFnArn, { hello: "cmr" });
+      expect((result as { echo: unknown }).echo).toEqual({ hello: "cmr" });
     });
 
     test("direct invoke echo", async () => {

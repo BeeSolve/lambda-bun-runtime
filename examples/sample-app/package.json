@@ -10,7 +10,7 @@
   "dependencies": {
     "@beesolve/lambda-bun-runtime": "file:../..",
     "@beesolve/lambda-fetch-api": "^1.0.0",
-    "aws-cdk-lib": "^2.238.0",
+    "aws-cdk-lib": "^2.278.0",
     "constructs": "^10.4.5"
   },
   "devDependencies": {

@@ -146,4 +146,30 @@ describe("mergeArtifacts", () => {
       }),
     ).toThrow("Duplicate result");
   });
+
+  test("merges layer and runtime results of the same region", () => {
+    const artifacts = mergeArtifacts({
+      packageVersion: "4.10404.0",
+      bunVersion: "1.4.4",
+      results: [
+        { region: "eu-central-1", layerVersionArn: "arn:a" },
+        { region: "eu-central-1", runtimeArn: "arn:r", runtimeAlias: "1.4" },
+      ],
+    });
+    expect(artifacts.regions["eu-central-1"]).toEqual({
+      layerVersionArn: "arn:a",
+      runtimeArn: "arn:r",
+      runtimeAlias: "1.4",
+    });
+  });
+
+  test("rejects a region without a layer result", () => {
+    expect(() =>
+      mergeArtifacts({
+        packageVersion: "4.10404.0",
+        bunVersion: "1.4.4",
+        results: [{ region: "eu-central-1", runtimeArn: "arn:r", runtimeAlias: "1.4" }],
+      }),
+    ).toThrow("Missing layer result");
+  });
 });

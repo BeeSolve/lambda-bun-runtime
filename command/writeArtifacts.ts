@@ -13,20 +13,41 @@ import type { Artifacts, RegionArtifacts } from "../src/artifacts";
 
 export interface RegionResult {
   readonly region: string;
-  readonly layerVersionArn: string;
+  readonly layerVersionArn?: string;
+  readonly runtimeArn?: string;
+  readonly runtimeAlias?: string;
 }
 
+/**
+ * Results of the same region (layer and runtime publish steps) are merged into one entry.
+ */
 export function mergeArtifacts(props: {
   readonly packageVersion: string;
   readonly bunVersion: string;
   readonly results: ReadonlyArray<RegionResult>;
 }): Artifacts {
-  const regions: Record<string, RegionArtifacts> = {};
+  const partial: Record<string, Omit<RegionResult, "region">> = {};
   for (const result of props.results) {
-    if (regions[result.region] != null) {
-      throw new Error(`Duplicate result for region ${result.region}.`);
+    const { region, ...fields } = result;
+    const previous = partial[region] ?? {};
+    for (const key of Object.keys(fields) as Array<keyof typeof fields>) {
+      if (previous[key] != null && fields[key] != null) {
+        throw new Error(`Duplicate result for region ${region}: ${key}.`);
+      }
     }
-    regions[result.region] = { layerVersionArn: result.layerVersionArn };
+    partial[region] = { ...previous, ...fields };
+  }
+
+  const regions: Record<string, RegionArtifacts> = {};
+  for (const [region, fields] of Object.entries(partial)) {
+    if (fields.layerVersionArn == null) {
+      throw new Error(`Missing layer result for region ${region}.`);
+    }
+    regions[region] = {
+      layerVersionArn: fields.layerVersionArn,
+      ...(fields.runtimeArn == null ? {} : { runtimeArn: fields.runtimeArn }),
+      ...(fields.runtimeAlias == null ? {} : { runtimeAlias: fields.runtimeAlias }),
+    };
   }
   const sortedRegions = Object.fromEntries(
     Object.entries(regions).sort(([left], [right]) => left.localeCompare(right)),
