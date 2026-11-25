@@ -272,6 +272,11 @@ jobs:
           npm version "${{ needs.prepare.outputs.package-version }}" --no-git-tag-version
           npm pack
 
+      - name: Compute layer zip checksum
+        id: checksum
+        run: |
+          echo "sha256=$(sha256sum lib/bun-lambda-layer-${{ needs.prepare.outputs.bun-version }}.zip | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
@@ -288,6 +293,12 @@ jobs:
             ### Published artifacts
             The layer and the customer-managed runtime are public in `eu-north-1`, `eu-central-1`, `eu-west-1`, `us-east-1` and `us-west-2`. ARNs are in `artifacts.json`.
             Runtime aliases: `<x.y.z>`, `<x.y>` (the `BunFunction` default, follows patch releases), `<x>` and `latest`.
+
+            ### Verification
+            - Git commit: `${{ github.sha }}`
+            - Layer zip SHA-256: `${{ steps.checksum.outputs.sha256 }}`
+
+            The description of every published layer version carries the first 12 characters of the git commit and the first 16 of the zip SHA-256.
 
             ### Assets
             - `bun-lambda-layer-${{ needs.prepare.outputs.bun-version }}.zip` - the layer zip (Linux ARM64) that was published
