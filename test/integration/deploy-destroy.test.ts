@@ -33,6 +33,9 @@ interface StackOutputs {
   S3WriterFnArn: string;
   TestBucketName: string;
   StreamingFnArn: string;
+  StreamingHttpUrl: string;
+  StreamingHttpLayerUrl: string;
+  StreamingCloudFrontUrl: string;
 }
 
 function run(cmd: string, cwd = sampleApp) {
@@ -157,6 +160,33 @@ describeInteg(
       }
       expect(body).toBe("hello from streaming");
     });
+
+    for (const [label, urlKey] of [
+      ["customer-managed runtime", "StreamingHttpUrl"],
+      ["layer", "StreamingHttpLayerUrl"],
+      ["customer-managed runtime behind CloudFront with OAC", "StreamingCloudFrontUrl"],
+    ] as const) {
+      test(`Function URL streaming keeps status, headers and chunk timing on the ${label}`, async () => {
+        const startedAt = Date.now();
+        const res = await fetch(outputs[urlKey]);
+        expect(res.status).toBe(201);
+        expect(res.headers.get("x-custom")).toBe("prelude");
+        expect(res.headers.get("content-type")).toContain("text/plain");
+        if (res.body == null) throw new Error("Response has no body");
+        const decoder = new TextDecoder();
+        const arrivals: Array<number> = [];
+        let body = "";
+        for await (const chunk of res.body) {
+          arrivals.push(Date.now() - startedAt);
+          body += decoder.decode(chunk, { stream: true });
+        }
+        expect(body).toBe("chunk 1\nchunk 2\nchunk 3\nchunk 4\nchunk 5\n");
+        // Unbuffered: the first and last bytes are separated by about 4 x 300 ms.
+        const first = arrivals[0] ?? 0;
+        const last = arrivals[arrivals.length - 1] ?? 0;
+        expect(last - first).toBeGreaterThan(900);
+      });
+    }
 
     test("Bun-native S3 write", async () => {
       await invokeLambda(outputs.S3WriterFnArn, {

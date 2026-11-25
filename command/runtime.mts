@@ -16,6 +16,13 @@ type Handler = (
   context: LambdaContext,
 ) => Promise<StreamResponse | unknown> | StreamResponse | unknown;
 
+interface ResponseStream {
+  write(chunk: StreamChunk): void;
+  end(chunk?: StreamChunk): void;
+  setContentType(type: string): void;
+  _onBeforeFirstWrite?: (write: (chunk: StreamChunk) => void) => void;
+}
+
 interface LambdaError {
   errorType: string;
   errorMessage: string;
@@ -40,6 +47,27 @@ const filename = handlerEnv.substring(0, lastDot);
 const exportName = handlerEnv.substring(lastDot + 1);
 const taskRoot = process.env.LAMBDA_TASK_ROOT ?? "/var/task";
 const modulePath = `${taskRoot}/${filename}`;
+
+const streamingMarker = Symbol.for("aws.lambda.runtime.handler.streaming");
+const httpResponseContentType = "application/vnd.awslambda.http-integration-response";
+
+// Mirrors the awslambda global of the Node.js managed runtime so that code written for it
+// (e.g. asResponseStreamHandler from @beesolve/lambda-fetch-api) runs unchanged.
+Object.assign(globalThis, {
+  awslambda: {
+    streamifyResponse: (fn: object) => Object.assign(fn, { [streamingMarker]: "response" }),
+    HttpResponseStream: {
+      from: (stream: ResponseStream, prelude: object) => {
+        stream.setContentType(httpResponseContentType);
+        stream._onBeforeFirstWrite = (write) => {
+          write(JSON.stringify(prelude));
+          write(new Uint8Array(8));
+        };
+        return stream;
+      },
+    },
+  },
+});
 
 const handler: Handler = await resolveHandler({ modulePath, exportName });
 
@@ -68,6 +96,28 @@ while (true) {
     logStreamName,
     getRemainingTimeInMillis: () => deadlineMs - Date.now(),
   };
+
+  const isStreamifiedHandler =
+    (handler as unknown as Record<symbol, unknown>)[streamingMarker] === "response";
+  if (isStreamifiedHandler) {
+    const responseStream = createResponseStream({
+      url: `${baseUrl}/runtime/invocation/${requestId}/response`,
+    });
+    try {
+      await (handler as unknown as StreamifiedHandler)(event, responseStream.stream, context);
+      responseStream.stream.end();
+      await responseStream.done();
+    } catch (err: unknown) {
+      if (!responseStream.started()) {
+        await postError({ path: `runtime/invocation/${requestId}/error`, error: err });
+        continue;
+      }
+      // Bun's fetch has no request trailers, so a mid-stream failure can only abort the request.
+      responseStream.abort({ error: err });
+      await responseStream.done().catch(() => undefined);
+    }
+    continue;
+  }
 
   try {
     const result = await handler(event, context);
@@ -125,6 +175,80 @@ function formatError(props: { error: unknown }): LambdaError {
   return {
     errorType: "Error",
     errorMessage: typeof props.error === "string" ? props.error : Bun.inspect(props.error),
+  };
+}
+
+type StreamifiedHandler = (
+  event: unknown,
+  responseStream: ResponseStream,
+  context: LambdaContext,
+) => Promise<unknown> | unknown;
+
+function createResponseStream(props: { url: string }) {
+  const encoder = new TextEncoder();
+  const state: {
+    contentType?: string;
+    started: boolean;
+    ended: boolean;
+    post?: Promise<Response>;
+    controller?: ReadableStreamDefaultController<Uint8Array>;
+  } = { started: false, ended: false };
+  const body = new ReadableStream<Uint8Array>({
+    start(controller) {
+      state.controller = controller;
+    },
+  });
+
+  const enqueue = (chunk: StreamChunk) => {
+    const bytes = typeof chunk === "string" ? encoder.encode(chunk) : chunk;
+    if (bytes.length === 0) return;
+    state.controller?.enqueue(bytes);
+  };
+
+  // The content type is a request header, so the POST can only start once it is final.
+  const start = () => {
+    if (state.started) return;
+    state.started = true;
+    stream._onBeforeFirstWrite?.(enqueue);
+    state.post = fetch(props.url, {
+      method: "POST",
+      headers: {
+        "Lambda-Runtime-Function-Response-Mode": "streaming",
+        "Transfer-Encoding": "chunked",
+        ...(state.contentType != null ? { "Content-Type": state.contentType } : {}),
+      },
+      body,
+    });
+  };
+
+  const stream: ResponseStream = {
+    write(chunk) {
+      start();
+      enqueue(chunk);
+    },
+    end(chunk) {
+      if (state.ended) return;
+      start();
+      if (chunk != null) enqueue(chunk);
+      state.ended = true;
+      state.controller?.close();
+    },
+    setContentType(type) {
+      state.contentType = type;
+    },
+  };
+
+  return {
+    stream,
+    started: () => state.started,
+    done: async () => {
+      await state.post;
+    },
+    abort: (abortProps: { error: unknown }) => {
+      if (state.ended) return;
+      state.ended = true;
+      state.controller?.error(abortProps.error);
+    },
   };
 }
 

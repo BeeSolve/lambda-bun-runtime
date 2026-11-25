@@ -1,6 +1,8 @@
 import * as path from "node:path";
 import { CfnOutput, RemovalPolicy, Stack, StackProps } from "aws-cdk-lib";
 import * as apigw from "aws-cdk-lib/aws-apigateway";
+import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
+import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as s3 from "aws-cdk-lib/aws-s3";
@@ -70,6 +72,43 @@ export class SampleStack extends Stack {
       bunLayer,
     });
 
+    // Streaming with HTTP metadata (status code + headers) via Function URL, on the CMR and on
+    // the layer. Same source file, uses the awslambda global provided by the runtime.
+    const streamingHttpFn = new BunFunction(this, "StreamingHttpFn", {
+      entrypoint: src("streaming-http.ts"),
+      ...(runtimeArn == null ? {} : { bunRuntime: { runtimeArn, runtimeAlias } }),
+    });
+    const streamingHttpUrl = streamingHttpFn.addFunctionUrl({
+      authType: lambda.FunctionUrlAuthType.NONE,
+      invokeMode: lambda.InvokeMode.RESPONSE_STREAM,
+    });
+    const streamingHttpLayerFn = new BunFunctionWithLayer(this, "StreamingHttpLayerFn", {
+      entrypoint: src("streaming-http.ts"),
+      bunLayer,
+    });
+    const streamingHttpLayerUrl = streamingHttpLayerFn.addFunctionUrl({
+      authType: lambda.FunctionUrlAuthType.NONE,
+      invokeMode: lambda.InvokeMode.RESPONSE_STREAM,
+    });
+
+    // Streaming behind CloudFront with OAC: the Function URL requires AWS_IAM and only the
+    // distribution can invoke it.
+    const streamingHttpOacFn = new BunFunction(this, "StreamingHttpOacFn", {
+      entrypoint: src("streaming-http.ts"),
+      ...(runtimeArn == null ? {} : { bunRuntime: { runtimeArn, runtimeAlias } }),
+    });
+    const streamingHttpOacUrl = streamingHttpOacFn.addFunctionUrl({
+      authType: lambda.FunctionUrlAuthType.AWS_IAM,
+      invokeMode: lambda.InvokeMode.RESPONSE_STREAM,
+    });
+    const distribution = new cloudfront.Distribution(this, "StreamingDistribution", {
+      defaultBehavior: {
+        origin: origins.FunctionUrlOrigin.withOriginAccessControl(streamingHttpOacUrl),
+        cachePolicy: cloudfront.CachePolicy.CACHING_DISABLED,
+        allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD,
+      },
+    });
+
     // S3 writer — direct invoke, Bun-native S3
     const testBucket = new s3.Bucket(this, "TestBucket", {
       autoDeleteObjects: true,
@@ -96,6 +135,11 @@ export class SampleStack extends Stack {
     new CfnOutput(this, "CmrEchoFnArn", { value: cmrEchoFn.functionArn });
     new CfnOutput(this, "S3WriterFnArn", { value: s3WriterFn.functionArn });
     new CfnOutput(this, "TestBucketName", { value: testBucket.bucketName });
+    new CfnOutput(this, "StreamingHttpUrl", { value: streamingHttpUrl.url });
+    new CfnOutput(this, "StreamingHttpLayerUrl", { value: streamingHttpLayerUrl.url });
+    new CfnOutput(this, "StreamingCloudFrontUrl", {
+      value: `https://${distribution.distributionDomainName}/`,
+    });
     new CfnOutput(this, "StreamingFnArn", { value: streamingFn.functionArn });
   }
 }
