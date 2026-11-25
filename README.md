@@ -161,7 +161,22 @@ export const handler = async () => {
 
 Invoke streaming functions using the AWS SDK's `InvokeWithResponseStream` API, or expose them via a Function URL with `invokeMode: InvokeMode.RESPONSE_STREAM`.
 
-For HTTP streaming with custom status codes and response headers (e.g., `Content-Type: text/event-stream`), use [`asResponseStreamHandler`](#response-streaming-1) from `@beesolve/lambda-fetch-api`, which handles the HTTP metadata framing required by Function URLs.
+#### Status code and headers on Function URLs
+
+The runtime defines the `awslambda` global of the Node.js managed runtime (`awslambda.streamifyResponse` and `awslambda.HttpResponseStream.from`), so code written for it runs unchanged. [`asResponseStreamHandler`](#response-streaming-1) from `@beesolve/lambda-fetch-api` works, or use the global directly:
+
+```ts
+export const handler = awslambda.streamifyResponse(async (event, responseStream) => {
+  const stream = awslambda.HttpResponseStream.from(responseStream, {
+    statusCode: 201,
+    headers: { "content-type": "text/plain", "x-custom": "value" },
+  });
+  stream.write("hello ");
+  stream.end("world");
+});
+```
+
+Without `HttpResponseStream.from` the stream is posted as plain bytes. If the handler throws before the first write, the error is reported normally. If it throws after streaming started, the request is aborted, because Bun's `fetch` cannot send the error trailers.
 
 ## Fetch API Support
 

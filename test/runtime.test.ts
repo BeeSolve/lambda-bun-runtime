@@ -602,6 +602,107 @@ describe("streaming response", () => {
   });
 });
 
+describe("streaming with HTTP metadata", () => {
+  async function runStreamifiedHandler(props: { port: number; name: string; source: string }) {
+    const tmpDir = `/tmp/test-${props.name}`;
+    mkdirSync(tmpDir, { recursive: true });
+    writeFileSync(`${tmpDir}/h.js`, props.source);
+    const seen: {
+      contentType: string | null;
+      mode: string | null;
+      body: Uint8Array | null;
+      errorBody: string | null;
+    } = { contentType: null, mode: null, body: null, errorBody: null };
+    const server = Bun.serve({
+      port: props.port,
+      async fetch(req) {
+        const url = new URL(req.url);
+        if (url.pathname === "/2018-06-01/runtime/invocation/next") {
+          return new Response(JSON.stringify({}), {
+            headers: {
+              "Lambda-Runtime-Aws-Request-Id": "req-meta",
+              "Lambda-Runtime-Invoked-Function-Arn": "arn:test",
+              "Lambda-Runtime-Deadline-Ms": String(Date.now() + 30000),
+            },
+          });
+        }
+        if (url.pathname.endsWith("/response")) {
+          seen.contentType = req.headers.get("Content-Type");
+          seen.mode = req.headers.get("Lambda-Runtime-Function-Response-Mode");
+          seen.body = new Uint8Array(await req.arrayBuffer());
+        }
+        if (url.pathname.endsWith("/error")) seen.errorBody = await req.text();
+        return new Response("OK");
+      },
+    });
+    const proc = spawn(["bun", "command/runtime.mts"], {
+      env: {
+        ...process.env,
+        AWS_LAMBDA_RUNTIME_API: `127.0.0.1:${props.port}`,
+        _HANDLER: "h.handler",
+        LAMBDA_TASK_ROOT: tmpDir,
+      },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    await waitFor({
+      condition: () => seen.body != null || seen.errorBody != null,
+      timeoutMs: 15000,
+    });
+    proc.kill();
+    await proc.exited;
+    server.stop();
+    rmSync(tmpDir, { recursive: true, force: true });
+    return seen;
+  }
+
+  test("HttpResponseStream.from sends content type, JSON prelude, 8 zero bytes and body", async () => {
+    const prelude = { statusCode: 201, headers: { "x-custom": "prelude" } };
+    const seen = await runStreamifiedHandler({
+      port: 19270,
+      name: "meta-prelude",
+      source: `export const handler = awslambda.streamifyResponse(async (event, stream) => {
+        stream = awslambda.HttpResponseStream.from(stream, ${JSON.stringify(prelude)});
+        stream.write("");
+        stream.write("hello ");
+        stream.end("world");
+      });`,
+    });
+    const expected = Buffer.concat([
+      Buffer.from(JSON.stringify(prelude)),
+      Buffer.alloc(8),
+      Buffer.from("hello world"),
+    ]);
+    expect(seen.contentType).toBe("application/vnd.awslambda.http-integration-response");
+    expect(seen.mode).toBe("streaming");
+    expect(Buffer.from(seen.body ?? new Uint8Array()).equals(expected)).toBe(true);
+  });
+
+  test("streamified handler without HttpResponseStream.from posts no content type", async () => {
+    const seen = await runStreamifiedHandler({
+      port: 19271,
+      name: "meta-plain",
+      source: `export const handler = awslambda.streamifyResponse(async (event, stream) => {
+        stream.write("a");
+        stream.end("b");
+      });`,
+    });
+    expect(seen.contentType).toBeNull();
+    expect(new TextDecoder().decode(seen.body ?? new Uint8Array())).toBe("ab");
+  });
+
+  test("throw before the first write posts to the error endpoint", async () => {
+    const seen = await runStreamifiedHandler({
+      port: 19272,
+      name: "meta-error",
+      source: `export const handler = awslambda.streamifyResponse(async () => {
+        throw new Error("boom");
+      });`,
+    });
+    expect(seen.errorBody).toContain("boom");
+  });
+});
+
 describe("event passthrough (Property 2)", () => {
   test("preserves arbitrary JSON data through handler", async () => {
     const tmpDir = "/tmp/test-passthrough";
