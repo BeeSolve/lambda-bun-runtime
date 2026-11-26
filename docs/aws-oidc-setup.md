@@ -147,7 +147,7 @@ bunx cdk bootstrap \
 
 #### Scoped CDK execution policy
 
-Save as `cfn-exec-policy.json`, replacing `<ACCOUNT_ID>` throughout. This covers everything CDK needs to deploy this specific stack (Lambda, API Gateway, S3, CloudWatch Logs, IAM execution roles).
+Save as `cfn-exec-policy.json`, replacing `<ACCOUNT_ID>` throughout. This covers everything CDK needs to deploy this specific stack (Lambda, API Gateway, S3, CloudWatch Logs, IAM execution roles, and CloudFront with an origin access control for the streaming Function URL behind a distribution).
 
 ```json
 {
@@ -223,6 +223,28 @@ Save as `cfn-exec-policy.json`, replacing `<ACCOUNT_ID>` throughout. This covers
         "logs:TagResource"
       ],
       "Resource": "arn:aws:logs:eu-central-1:<ACCOUNT_ID>:log-group:/aws/lambda/BunLayerInteg-*"
+    },
+    {
+      "Sid": "CloudFrontOac",
+      "Effect": "Allow",
+      "Action": [
+        "cloudfront:CreateDistribution",
+        "cloudfront:CreateDistributionWithTags",
+        "cloudfront:GetDistribution",
+        "cloudfront:UpdateDistribution",
+        "cloudfront:DeleteDistribution",
+        "cloudfront:TagResource",
+        "cloudfront:UntagResource",
+        "cloudfront:ListTagsForResource",
+        "cloudfront:CreateOriginAccessControl",
+        "cloudfront:GetOriginAccessControl",
+        "cloudfront:UpdateOriginAccessControl",
+        "cloudfront:DeleteOriginAccessControl"
+      ],
+      "Resource": [
+        "arn:aws:cloudfront::<ACCOUNT_ID>:distribution/*",
+        "arn:aws:cloudfront::<ACCOUNT_ID>:origin-access-control/*"
+      ]
     },
     {
       "Sid": "SSMBootstrapVersion",
