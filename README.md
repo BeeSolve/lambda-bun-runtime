@@ -127,6 +127,10 @@ export const handler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
 };
 ```
 
+### Background work with waitUntil
+
+Call `context.waitUntil(promise)` (or `awslambda.waitUntil(promise)`) to let work finish after the response is sent. The runtime waits for it before asking Lambda for the next invocation, up to the deadline minus `BUN_LAMBDA_WAIT_UNTIL_MARGIN_MS` (default 1000). Work that is neither awaited nor registered is still frozen by Lambda. See [the how-to](./docs/how-to/wait-until.md).
+
 ### Response Streaming
 
 Return a `ReadableStream<Uint8Array>` or any `AsyncIterable<Uint8Array | string>` (including async generators) to stream the response. The runtime detects the return type automatically and sends it using HTTP chunked transfer encoding with the `Lambda-Runtime-Function-Response-Mode: streaming` header — no wrapper or import required.

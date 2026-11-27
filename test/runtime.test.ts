@@ -762,3 +762,205 @@ describe("event passthrough (Property 2)", () => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 });
+
+describe("waitUntil", () => {
+  async function runWaitUntil(props: {
+    port: number;
+    name: string;
+    source: string;
+    deadlineInMs?: number;
+    marginMs?: number;
+    settleMs: number;
+  }) {
+    const tmpDir = `/tmp/test-${props.name}`;
+    mkdirSync(tmpDir, { recursive: true });
+    writeFileSync(`${tmpDir}/h.js`, props.source);
+    const timeline: Array<string> = [];
+    const server = Bun.serve({
+      port: props.port,
+      async fetch(req) {
+        const url = new URL(req.url);
+        if (url.pathname === "/2018-06-01/runtime/invocation/next") {
+          const count = timeline.filter((entry) => entry.startsWith("next")).length;
+          timeline.push(`next-${count + 1}`);
+          return new Response(JSON.stringify({}), {
+            headers: {
+              "Lambda-Runtime-Aws-Request-Id": `req-${count + 1}`,
+              "Lambda-Runtime-Invoked-Function-Arn": "arn:test",
+              "Lambda-Runtime-Deadline-Ms": String(Date.now() + (props.deadlineInMs ?? 30000)),
+            },
+          });
+        }
+        if (url.pathname.endsWith("/response")) {
+          await req.arrayBuffer();
+          timeline.push("response");
+        }
+        if (url.pathname.endsWith("/error")) {
+          await req.text();
+          timeline.push("error");
+        }
+        if (url.pathname.startsWith("/marker/")) timeline.push(url.pathname.slice(8));
+        return new Response("OK");
+      },
+    });
+    const proc = spawn(["bun", "command/runtime.mts"], {
+      env: {
+        ...process.env,
+        AWS_LAMBDA_RUNTIME_API: `127.0.0.1:${props.port}`,
+        _HANDLER: "h.handler",
+        LAMBDA_TASK_ROOT: tmpDir,
+        ...(props.marginMs != null
+          ? { BUN_LAMBDA_WAIT_UNTIL_MARGIN_MS: String(props.marginMs) }
+          : {}),
+      },
+      stdout: "pipe",
+      stderr: "pipe",
+    });
+    await new Promise((r) => setTimeout(r, props.settleMs));
+    proc.kill();
+    await proc.exited;
+    server.stop();
+    const stderr = await new Response(proc.stderr).text();
+    rmSync(tmpDir, { recursive: true, force: true });
+    return { timeline, stderr };
+  }
+
+  const mark = (name: string, port: number) => `fetch("http://127.0.0.1:${port}/marker/${name}")`;
+
+  test("task finishes after the response and before the next invocation is requested", async () => {
+    const port = 19280;
+    const { timeline } = await runWaitUntil({
+      port,
+      name: "wu-order",
+      settleMs: 2500,
+      source: `export const handler = async (event, context) => {
+        context.waitUntil(new Promise((r) => setTimeout(r, 400)).then(() => ${mark("done", port)}));
+        return { ok: true };
+      };`,
+    });
+    expect(timeline.slice(0, 4)).toEqual(["next-1", "response", "done", "next-2"]);
+  });
+
+  test("awslambda.waitUntil is bound to the current invocation", async () => {
+    const port = 19281;
+    const { timeline } = await runWaitUntil({
+      port,
+      name: "wu-global",
+      settleMs: 2500,
+      source: `export const handler = async () => {
+        awslambda.waitUntil(new Promise((r) => setTimeout(r, 300)).then(() => ${mark("done", port)}));
+        return 1;
+      };`,
+    });
+    expect(timeline.slice(0, 4)).toEqual(["next-1", "response", "done", "next-2"]);
+  });
+
+  test("tasks added while draining are also awaited", async () => {
+    const port = 19282;
+    const { timeline } = await runWaitUntil({
+      port,
+      name: "wu-nested",
+      settleMs: 2500,
+      source: `export const handler = async (event, context) => {
+        context.waitUntil(new Promise((r) => setTimeout(r, 200)).then(() => {
+          context.waitUntil(new Promise((r) => setTimeout(r, 200)).then(() => ${mark("second", port)}));
+          return ${mark("first", port)};
+        }));
+        return 1;
+      };`,
+    });
+    expect(timeline.slice(0, 5)).toEqual(["next-1", "response", "first", "second", "next-2"]);
+  });
+
+  test("drain stops at the deadline minus margin and warns", async () => {
+    const port = 19283;
+    const startedAt = Date.now();
+    const { timeline, stderr } = await runWaitUntil({
+      port,
+      name: "wu-deadline",
+      deadlineInMs: 2000,
+      marginMs: 1000,
+      settleMs: 3500,
+      source: `export const handler = async (event, context) => {
+        context.waitUntil(new Promise((r) => setTimeout(r, 10000)).then(() => ${mark("late", port)}));
+        return 1;
+      };`,
+    });
+    expect(Date.now() - startedAt).toBeGreaterThan(1000);
+    expect(timeline).not.toContain("late");
+    expect(timeline.slice(0, 3)).toEqual(["next-1", "response", "next-2"]);
+    expect(stderr).toContain("1 task(s) still pending");
+  });
+
+  test("error path posts the error, then drains", async () => {
+    const port = 19284;
+    const { timeline } = await runWaitUntil({
+      port,
+      name: "wu-error",
+      settleMs: 2500,
+      source: `export const handler = async (event, context) => {
+        context.waitUntil(new Promise((r) => setTimeout(r, 300)).then(() => ${mark("done", port)}));
+        throw new Error("boom");
+      };`,
+    });
+    expect(timeline.slice(0, 4)).toEqual(["next-1", "error", "done", "next-2"]);
+  });
+
+  test("rejected task is logged and does not change the result", async () => {
+    const port = 19285;
+    const { timeline, stderr } = await runWaitUntil({
+      port,
+      name: "wu-reject",
+      settleMs: 2500,
+      source: `export const handler = async (event, context) => {
+        context.waitUntil(Promise.reject(new Error("bg-failure")));
+        return 1;
+      };`,
+    });
+    expect(timeline.slice(0, 3)).toEqual(["next-1", "response", "next-2"]);
+    expect(stderr).toContain("bg-failure");
+  });
+
+  test("streamified handler drains after the stream is done", async () => {
+    const port = 19286;
+    const { timeline } = await runWaitUntil({
+      port,
+      name: "wu-stream",
+      settleMs: 2500,
+      source: `export const handler = awslambda.streamifyResponse(async (event, stream, context) => {
+        context.waitUntil(new Promise((r) => setTimeout(r, 300)).then(() => ${mark("done", port)}));
+        stream.end("hi");
+      });`,
+    });
+    expect(timeline.slice(0, 4)).toEqual(["next-1", "response", "done", "next-2"]);
+  });
+
+  test("tasks do not leak into the next invocation", async () => {
+    const port = 19287;
+    const { timeline } = await runWaitUntil({
+      port,
+      name: "wu-leak",
+      settleMs: 3000,
+      source: `let calls = 0;
+      export const handler = async (event, context) => {
+        calls++;
+        if (calls === 1) context.waitUntil(${mark("first", port)});
+        return calls;
+      };`,
+    });
+    expect(timeline.filter((entry) => entry === "first")).toHaveLength(1);
+    expect(timeline.indexOf("first")).toBeLessThan(timeline.indexOf("next-2"));
+  });
+
+  test("handlers that never call waitUntil proceed immediately", async () => {
+    const port = 19288;
+    const { timeline, stderr } = await runWaitUntil({
+      port,
+      name: "wu-unused",
+      settleMs: 1500,
+      source: `export const handler = async () => 1;`,
+    });
+    expect(timeline.slice(0, 3)).toEqual(["next-1", "response", "next-2"]);
+    expect(stderr).not.toContain("waitUntil");
+  });
+});
