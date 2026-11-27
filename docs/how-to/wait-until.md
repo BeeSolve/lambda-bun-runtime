@@ -5,7 +5,10 @@ Use this when the handler can answer the caller first and still has work to do, 
 ## Usage
 
 ```ts
-export const handler = async (event: unknown, context: { waitUntil(promise: Promise<unknown>): void }) => {
+export const handler = async (
+  event: unknown,
+  context: { waitUntil(promise: Promise<unknown>): void },
+) => {
   context.waitUntil(flushMetrics());
   return { ok: true };
 };

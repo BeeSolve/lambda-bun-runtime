@@ -13,7 +13,7 @@
 | [Getting Started](./docs/how-to/getting-started.md)                 | Install and deploy your first Bun Lambda on the Bun customer-managed runtime              |
 | [Publish your own runtime](./docs/how-to/custom-runtime.md)         | Publish the runtime in your account or region with `publish-runtime`                      |
 | [Stream with status code and headers](./docs/how-to/streaming.md)   | `awslambda.streamifyResponse`, `asResponseStreamHandler`, Function URL and CloudFront OAC |
-| [Run work after the response](./docs/how-to/wait-until.md) | `context.waitUntil`, `awslambda.waitUntil`, and `BUN_LAMBDA_WAIT_UNTIL_MARGIN_MS` |
+| [Run work after the response](./docs/how-to/wait-until.md)          | `context.waitUntil`, `awslambda.waitUntil`, and `BUN_LAMBDA_WAIT_UNTIL_MARGIN_MS`         |
 | [Use a layer instead of the runtime](./docs/how-to/custom-layer.md) | `BunFunctionWithLayer`, a layer ARN, or a layer zip you build yourself                    |
 
 ## Working Examples
