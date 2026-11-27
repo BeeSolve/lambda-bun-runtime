@@ -7,6 +7,7 @@ interface LambdaContext {
   logGroupName: string;
   logStreamName: string;
   getRemainingTimeInMillis(): number;
+  waitUntil(promise: Promise<unknown>): void;
 }
 
 type StreamChunk = Uint8Array | string;
@@ -69,6 +70,23 @@ Object.assign(globalThis, {
   },
 });
 
+const defaultWaitUntilMarginMs = 1000;
+const parsedMarginMs = Number(
+  process.env.BUN_LAMBDA_WAIT_UNTIL_MARGIN_MS ?? defaultWaitUntilMarginMs,
+);
+const waitUntilMarginMs =
+  Number.isFinite(parsedMarginMs) && parsedMarginMs >= 0
+    ? parsedMarginMs
+    : defaultWaitUntilMarginMs;
+
+// awslambda.waitUntil is global, so it needs to find the invocation currently being served.
+const currentInvocation: { pending: Set<Promise<unknown>> } = { pending: new Set() };
+
+Object.assign((globalThis as unknown as { awslambda: object }).awslambda, {
+  waitUntil: (promise: Promise<unknown>) =>
+    trackPromise({ pending: currentInvocation.pending, promise }),
+});
+
 const handler: Handler = await resolveHandler({ modulePath, exportName });
 
 const functionName = process.env.AWS_LAMBDA_FUNCTION_NAME ?? "";
@@ -86,6 +104,9 @@ while (true) {
 
   const event: unknown = await res.json();
 
+  const pending = new Set<Promise<unknown>>();
+  currentInvocation.pending = pending;
+
   const context: LambdaContext = {
     functionName,
     functionVersion,
@@ -95,6 +116,7 @@ while (true) {
     logGroupName,
     logStreamName,
     getRemainingTimeInMillis: () => deadlineMs - Date.now(),
+    waitUntil: (promise) => trackPromise({ pending, promise }),
   };
 
   const isStreamifiedHandler =
@@ -110,12 +132,14 @@ while (true) {
     } catch (err: unknown) {
       if (!responseStream.started()) {
         await postError({ path: `runtime/invocation/${requestId}/error`, error: err });
+        await drainPending({ pending, deadlineMs, marginMs: waitUntilMarginMs });
         continue;
       }
       // Bun's fetch has no request trailers, so a mid-stream failure can only abort the request.
       responseStream.abort({ error: err });
       await responseStream.done().catch(() => undefined);
     }
+    await drainPending({ pending, deadlineMs, marginMs: waitUntilMarginMs });
     continue;
   }
 
@@ -143,6 +167,7 @@ while (true) {
       error: err,
     });
   }
+  await drainPending({ pending, deadlineMs, marginMs: waitUntilMarginMs });
 }
 
 async function resolveHandler(props: { modulePath: string; exportName: string }): Promise<Handler> {
@@ -162,6 +187,39 @@ async function resolveHandler(props: { modulePath: string; exportName: string })
   }
   // Unreachable — initError calls process.exit, but TS needs a return
   throw new Error("Unreachable");
+}
+
+function trackPromise(props: { pending: Set<Promise<unknown>>; promise: Promise<unknown> }): void {
+  const tracked: Promise<unknown> = Promise.resolve(props.promise)
+    .catch((err: unknown) => {
+      console.error("waitUntil promise rejected:", err);
+    })
+    .finally(() => {
+      props.pending.delete(tracked);
+    });
+  props.pending.add(tracked);
+}
+
+// The response is already sent when this runs, so it never throws and never changes the result.
+// Promises added while draining are picked up by the next loop pass.
+async function drainPending(props: {
+  pending: Set<Promise<unknown>>;
+  deadlineMs: number;
+  marginMs: number;
+}): Promise<void> {
+  while (props.pending.size > 0) {
+    const budgetMs = props.deadlineMs - props.marginMs - Date.now();
+    const timeout = Promise.withResolvers<"timeout">();
+    const timer = setTimeout(() => timeout.resolve("timeout"), Math.max(budgetMs, 0));
+    const outcome = await Promise.race([Promise.allSettled(props.pending), timeout.promise]);
+    clearTimeout(timer);
+    if (outcome === "timeout") {
+      console.warn(
+        `waitUntil: ${props.pending.size} task(s) still pending at the drain deadline, continuing`,
+      );
+      return;
+    }
+  }
 }
 
 function formatError(props: { error: unknown }): LambdaError {
